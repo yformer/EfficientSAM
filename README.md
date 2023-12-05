@@ -38,7 +38,7 @@ The colab is shared [here](https://colab.research.google.com/drive/150dvh_lwbliC
 + [SAM](https://github.com/facebookresearch/segment-anything)
 + [MobileSAM](https://github.com/ChaoningZhang/MobileSAM)
 + [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM)
-+ [U-2-Net] (https://github.com/xuebinqin/U-2-Net)
++ [U-2-Net](https://github.com/xuebinqin/U-2-Net)
 
 
 If you're using EfficientSAM in your research or applications, please cite using this BibTeX:
