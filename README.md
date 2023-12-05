@@ -10,8 +10,10 @@ Online demo and examples can be found in the [project page](https://yformer.gith
 ## EfficientSAM Instanace Segmentation Examples
   |   |   |
 :-------------------------:|:-------------------------:
-![point-prompt](figs/examples/demo_point.png) |  ![box-prompt](figs/examples/demo_box.png)
-![segment everything](figs/examples/demo_everything.png)  |  ![Saliency](figs/examples/demo_saliency.png)
+Point-prompt | ![point-prompt](figs/examples/demo_point.png)
+Box-prompt |  ![box-prompt](figs/examples/demo_box.png)
+Segment everything |![segment everything](figs/examples/demo_everything.png)
+Saliency | ![Saliency](figs/examples/demo_saliency.png)
 
 ## Model
 
@@ -36,6 +38,7 @@ The colab is shared [here](https://colab.research.google.com/drive/150dvh_lwbliC
 + [SAM](https://github.com/facebookresearch/segment-anything)
 + [MobileSAM](https://github.com/ChaoningZhang/MobileSAM)
 + [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM)
++ [U-2-Net] (https://github.com/xuebinqin/U-2-Net)
 
 
 If you're using EfficientSAM in your research or applications, please cite using this BibTeX:
