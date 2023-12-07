@@ -8,7 +8,7 @@ EfficientSAM: Leveraged Masked Image Pretraining for Efficient Segment Anything
 ## Online Demo & Examples
 Online demo and examples can be found in the [project page](https://yformer.github.io/efficient-sam/).
 
-## EfficientSAM Instanace Segmentation Examples
+## EfficientSAM Instance Segmentation Examples
   |   |   |
 :-------------------------:|:-------------------------:
 Point-prompt | ![point-prompt](figs/examples/demo_point.png)
