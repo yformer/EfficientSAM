@@ -18,7 +18,7 @@ Segment everything |![segment everything](figs/examples/demo_everything.png)
 Saliency | ![Saliency](figs/examples/demo_saliency.png)
 
 ## Model
-Models for GPU/CPU are available at the file folder of [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM/)
+Models for GPU/CPU are available at the file folder of [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM/).
 
 | EfficientSAM-S | EfficientSAM-Ti |
 |------------------------------|------------------------------|
