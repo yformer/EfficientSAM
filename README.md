@@ -2,7 +2,7 @@
 EfficientSAM: Leveraged Masked Image Pretraining for Efficient Segment Anything
 
 ## News
-[Dec.6 2023] EfficientSAM demo is available on the [HuggingFace Space](https://huggingface.co/spaces/yunyangx/EfficientSAM) (huge thanks to all the HF team for their support).
+[Dec.6 2023] EfficientSAM demo is available on the [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM) (huge thanks to all the HF team for their support).
 
 [Dec.5 2023] We release the torchscript version of EfficientSAM and share a colab.
 
@@ -18,7 +18,7 @@ Segment everything |![segment everything](figs/examples/demo_everything.png)
 Saliency | ![Saliency](figs/examples/demo_saliency.png)
 
 ## Model
-Models for GPU/CPU are available at the file folder of [HuggingFace Space](https://huggingface.co/spaces/yunyangx/EfficientSAM/).
+Models for GPU/CPU are available at the file folder of [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM/).
 
 | EfficientSAM-S | EfficientSAM-Ti |
 |------------------------------|------------------------------|
