@@ -806,8 +806,8 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
         apply_feature_pyramid=encoder_apply_feature_pyramid,
     )
 
-    image_embedding_size = image_encoder.get_image_embedding_size()
-    encoder_transformer_output_dim = image_encoder.get_transformer_output_dim()
+    image_embedding_size = image_encoder.image_embedding_size
+    encoder_transformer_output_dim = image_encoder.transformer_output_dim
 
     sam = Sam(
         image_encoder=image_encoder,
@@ -851,11 +851,13 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     )
     if checkpoint is not None:
         with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f)
-        sam.load_state_dict(state_dict)
+            state_dict = torch.load(f,map_location='cpu')
+        sam.load_state_dict(state_dict['model'])
     sam.to(torch.device(device))
     return sam
 
 
 
-sam = build_efficient_sam()
+sam = build_efficient_sam('model_ckpt.pth')
+
+print(sam)
