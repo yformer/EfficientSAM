@@ -10,13 +10,11 @@ from typing import Any, List, Tuple, Type
 import torch
 import torch.nn.functional as F
 
-from omegaconf import OmegaConf
 from torch import nn, Tensor
 
-from .mlp import MLPBlock
-from .sam_decoder import MaskDecoder, NullPromptEncoder, PromptEncoder
-from .sam_encoder import ImageEncoderViT
-from .sam_metanet_encoder import ImageEncoderMetaNet
+from mlp import MLPBlock
+from efficient_sam_decoder import MaskDecoder, NullPromptEncoder, PromptEncoder
+from efficient_sam_encoder import ImageEncoderViT
 
 
 class TwoWayTransformer(nn.Module):
@@ -732,46 +730,39 @@ class Sam(nn.Module):
             return self
 
 
-def build_sam(
-    cfg, apply_softmax_on_iou_predictions=False, checkpoint=None, device="cuda"
-):
-    cfg = OmegaConf.create(cfg)
-    img_size = cfg.SEGMENTATION_MODEL.MODEL_INPUT_SIZE
-    encoder_patch_size = cfg.SEGMENTATION_MODEL.ENCODER_PATCH_SIZE
-    encoder_patch_embed_dim = cfg.SEGMENTATION_MODEL.ENCODER_PATCH_EMBED_DIM
-    encoder_patch_embed_apply_norm = (
-        cfg.SEGMENTATION_MODEL.ENCODER_PATCH_EMBED_APPLY_NORM
-    )
-    encoder_unet_conv_dims = cfg.SEGMENTATION_MODEL.ENCODER_UNET_CONV_DIMS
-    encoder_depth = cfg.SEGMENTATION_MODEL.ENCODER_DEPTH
-    encoder_num_heads = cfg.SEGMENTATION_MODEL.ENCODER_NUM_HEADS
-    encoder_use_rel_pos = cfg.SEGMENTATION_MODEL.ENCODER_USE_REL_POS
-    encoder_mlp_ratio = cfg.SEGMENTATION_MODEL.ENCODER_MLP_RATIO
-    encoder_drop_path_rate = cfg.SEGMENTATION_MODEL.ENCODER_DROP_PATH_RATE
-    encoder_neck_dims = cfg.SEGMENTATION_MODEL.ENCODER_NECK_DIMS
-    encoder_window_size = cfg.SEGMENTATION_MODEL.ENCODER_WINDOW_SIZE
-    encoder_global_attn_indexes = cfg.SEGMENTATION_MODEL.ENCODER_GLOBAL_ATTN_INDEXES
-    encoder_apply_feature_pyramid = cfg.SEGMENTATION_MODEL.ENCODER_APPLY_FEATURE_PYRAMID
-    encoder_use_metanet = cfg.SEGMENTATION_MODEL.ENCODER_USE_METANET
-    encoder_metanet_name = cfg.SEGMENTATION_MODEL.ENCODER_METANET_NAME
-    decoder_max_num_input_points = cfg.SEGMENTATION_MODEL.MAX_NUM_PTS
-    decoder_transformer_depth = cfg.SEGMENTATION_MODEL.DECODER_TRANSFORMER_DEPTH
-    decoder_transformer_mlp_dim = cfg.SEGMENTATION_MODEL.DECODER_TRANSFORMER_MLP_DIM
-    decoder_num_heads = cfg.SEGMENTATION_MODEL.DECODER_NUM_HEADS
-    decoder_p_dropout = cfg.SEGMENTATION_MODEL.DECODER_P_DROPOUT
-    decoder_upscaling_layer_dims = cfg.SEGMENTATION_MODEL.DECODER_UPSCALING_LAYER_DIMS
-    num_multimask_outputs = cfg.SEGMENTATION_MODEL.NUM_MULTIMASK_OUTPUTS
-    iou_head_depth = cfg.SEGMENTATION_MODEL.IOU_HEAD_DEPTH
-    iou_head_hidden_dim = cfg.SEGMENTATION_MODEL.IOU_HEAD_HIDDEN_DIM
-    fusion_type = cfg.SEGMENTATION_MODEL.FUSION_TYPE
-    apply_softmax_on_iou_predictions = apply_softmax_on_iou_predictions
-    user_input_circle_radius = cfg.SEGMENTATION_MODEL.USER_INPUT_CIRCLE_RADIUS
-    activation = cfg.SEGMENTATION_MODEL.ACTIVATION
-    normalization_type = cfg.SEGMENTATION_MODEL.NORMALIZATION_TYPE
-    normalize_before_activation = cfg.SEGMENTATION_MODEL.NORMALIZE_BEFORE_ACTIVATION
-    share_hypernetwork_mlp_weights = (
-        cfg.SEGMENTATION_MODEL.SHARE_HYPERNETWORK_MLP_WEIGHTS
-    )
+def build_efficient_sam(checkpoint=None, device='cpu'):
+    img_size = 1024
+    encoder_patch_size = 16
+    encoder_patch_embed_dim = 192
+    encoder_patch_embed_apply_norm = False
+    encoder_unet_conv_dims = []
+    encoder_depth = 12
+    encoder_num_heads = 3
+    encoder_use_rel_pos = False
+    encoder_mlp_ratio = 4.0
+    encoder_drop_path_rate = 0.4
+    encoder_neck_dims = [256, 256]
+    encoder_window_size = 0
+    encoder_global_attn_indexes = []
+    encoder_apply_feature_pyramid = False
+    encoder_use_metanet = False
+    encoder_metanet_name = "metanetv6_vit_237M_wopool"
+    decoder_max_num_input_points = 6
+    decoder_transformer_depth = 2
+    decoder_transformer_mlp_dim = 2048
+    decoder_num_heads = 8
+    decoder_p_dropout = 0.1
+    decoder_upscaling_layer_dims = [64, 32]
+    num_multimask_outputs = 3
+    iou_head_depth = 3
+    iou_head_hidden_dim = 256
+    fusion_type = "late"
+    apply_softmax_on_iou_predictions = False
+    user_input_circle_radius = 5.0
+    activation = "gelu"
+    normalization_type = "layer_norm"
+    normalize_before_activation = False
+    share_hypernetwork_mlp_weights = False
 
     assert (
         img_size
@@ -794,29 +785,26 @@ def build_sam(
 
     late_fusion = fusion_type == "late" or fusion_type == "hybrid"
 
-    if encoder_use_metanet and encoder_metanet_name:
-        image_encoder = ImageEncoderMetaNet(encoder_metanet_name, img_size)
-    else:
-        image_encoder = ImageEncoderViT(
-            img_size=img_size,
-            patch_size=encoder_patch_size,
-            in_chans=5 if early_fusion else 3,
-            patch_embed_dim=encoder_patch_embed_dim,
-            patch_embed_apply_norm=encoder_patch_embed_apply_norm,
-            normalization_type=normalization_type,
-            unet_conv_dims=encoder_unet_conv_dims,
-            depth=encoder_depth,
-            num_heads=encoder_num_heads,
-            use_rel_pos=encoder_use_rel_pos,
-            mlp_ratio=encoder_mlp_ratio,
-            drop_path_rate=encoder_drop_path_rate,
-            neck_dims=encoder_neck_dims,
-            act_layer=activation_fn,
-            normalize_before_activation=normalize_before_activation,
-            window_size=encoder_window_size,
-            global_attn_indexes=encoder_global_attn_indexes,
-            apply_feature_pyramid=encoder_apply_feature_pyramid,
-        )
+    image_encoder = ImageEncoderViT(
+        img_size=img_size,
+        patch_size=encoder_patch_size,
+        in_chans=5 if early_fusion else 3,
+        patch_embed_dim=encoder_patch_embed_dim,
+        patch_embed_apply_norm=encoder_patch_embed_apply_norm,
+        normalization_type=normalization_type,
+        unet_conv_dims=encoder_unet_conv_dims,
+        depth=encoder_depth,
+        num_heads=encoder_num_heads,
+        use_rel_pos=encoder_use_rel_pos,
+        mlp_ratio=encoder_mlp_ratio,
+        drop_path_rate=encoder_drop_path_rate,
+        neck_dims=encoder_neck_dims,
+        act_layer=activation_fn,
+        normalize_before_activation=normalize_before_activation,
+        window_size=encoder_window_size,
+        global_attn_indexes=encoder_global_attn_indexes,
+        apply_feature_pyramid=encoder_apply_feature_pyramid,
+    )
 
     image_embedding_size = image_encoder.get_image_embedding_size()
     encoder_transformer_output_dim = image_encoder.get_transformer_output_dim()
@@ -867,3 +855,7 @@ def build_sam(
         sam.load_state_dict(state_dict)
     sam.to(torch.device(device))
     return sam
+
+
+
+sam = build_efficient_sam()
