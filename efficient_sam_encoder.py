@@ -6,13 +6,26 @@
 
 from typing import List, Optional, Tuple, Type
 
-import fvcore.nn.weight_init as weight_init
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .mlp import MLPBlock
-from .sam_decoder import ConvTranspose2dUsingLinear, DoubleConv, Down
+from mlp import MLPBlock
+from efficient_sam_decoder import ConvTranspose2dUsingLinear, DoubleConv, Down
+
+def c2_xavier_fill(module: nn.Module) -> None:
+    """
+    Initialize `module.weight` using the "XavierFill" implemented in Caffe2.
+    Also initializes `module.bias` to 0.
+
+    Args:
+        module (torch.nn.Module): module to initialize.
+    """
+    # Caffe2 implementation of XavierFill in fact
+    # corresponds to kaiming_uniform_ in PyTorch
+    nn.init.kaiming_uniform_(module.weight, a=1)
+    if module.bias is not None:
+        nn.init.constant_(module.bias, 0)
 
 
 # This class and its supporting functions below lightly adapted from the ViTDet backbone available at: https://github.com/facebookresearch/detectron2/blob/main/detectron2/modeling/backbone/vit.py # noqa
@@ -198,7 +211,7 @@ class ImageEncoderViT(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
         elif isinstance(m, nn.Conv2d):
-            weight_init.c2_xavier_fill(m)
+            c2_xavier_fill(m)
 
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         assert (
