@@ -2,6 +2,8 @@
 EfficientSAM: Leveraged Masked Image Pretraining for Efficient Segment Anything
 
 ## News
+[Dec.11 2023] The model code is fully available in this repository. The [sample_inference](https://github.com/yformer/EfficientSAM/blob/main/sample_inference.py) binary shows how to instantiate the model and query points on an image.
+
 [Dec.6 2023] EfficientSAM demo is available on the [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM) (huge thanks to all the HF team for their support).
 
 [Dec.5 2023] We release the torchscript version of EfficientSAM and share a colab.
