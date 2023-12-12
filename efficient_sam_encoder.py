@@ -152,13 +152,10 @@ class Block(nn.Module):
             act_layer=act_layer,
             drop=drop,
         )
-
     def forward(self, x):
         x = x + self.attn(self.norm1(x))
         x = x + self.mlp(self.norm2(x))
         return x
-
-
 
 def get_abs_pos(abs_pos, has_cls_token, hw):
     """
@@ -190,9 +187,6 @@ def get_abs_pos(abs_pos, has_cls_token, hw):
         return new_abs_pos.permute(0, 2, 3, 1)
     else:
         return abs_pos.reshape(1, h, w, -1)
-
-
-
 
 
 # Image encoder for efficient SAM.
@@ -227,24 +221,18 @@ class ImageEncoderViT(nn.Module):
         self.image_embedding_size = img_size // ((patch_size if patch_size > 0 else 1))
         self.transformer_output_dim = ([patch_embed_dim] + neck_dims)[-1]
         self.pretrain_use_cls_token = True
-
         pretrain_img_size = 224
-
-        self.patch_embed = PatchEmbed(img_size, patch_size, 3, patch_embed_dim)
-
+        self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, patch_embed_dim)
         # Initialize absolute positional embedding with pretrain image size.
         num_patches = (pretrain_img_size // patch_size) * (
             pretrain_img_size // patch_size
         )
         num_positions = num_patches + 1
         self.pos_embed = nn.Parameter(torch.zeros(1, num_positions, patch_embed_dim))
-
         self.blocks = nn.ModuleList()
         for i in range(depth):
             vit_block = Block(patch_embed_dim, num_heads, mlp_ratio, True)
             self.blocks.append(vit_block)
-
-
         self.neck = nn.Sequential(
             nn.Conv2d(
                 patch_embed_dim,
@@ -268,34 +256,18 @@ class ImageEncoderViT(nn.Module):
         assert (
             x.shape[2] == self.img_size and x.shape[3] == self.img_size
         ), "input image size must match self.img_size"
-
-        print('x=',x.shape)
         x = self.patch_embed(x)
-        print('x=',x.shape)
         # B C H W -> B H W C
         x = x.permute(0, 2, 3, 1)  # vit det block takes BHWC as input
         if self.pos_embed is not None:
             x = x + get_abs_pos(
                 self.pos_embed, self.pretrain_use_cls_token, (x.shape[1], x.shape[2])
             )
-
-        print('x=',x.shape)
-
-
         num_patches = x.shape[1]
         assert x.shape[2] == num_patches
-
         x = x.reshape(x.shape[0], num_patches * num_patches, x.shape[3])
-        print('x=',x.shape)
-
         for blk in self.blocks:
             x = blk(x)
-
-        print('x=',x.shape)
-
         x = x.reshape(x.shape[0], num_patches, num_patches, x.shape[2])
-
         x = self.neck(x.permute(0, 3, 1, 2))
-        print('x=',x.shape)
-
         return [x]

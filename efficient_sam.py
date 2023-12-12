@@ -68,7 +68,6 @@ class TwoWayTransformer(nn.Module):
             downsample_rate=attention_downsample_rate,
         )
         self.norm_final_attn = nn.LayerNorm(embedding_dim)
-        self.norm_final_attn.qconfig = None
 
     def forward(
         self,
@@ -147,7 +146,6 @@ class TwoWayAttentionBlock(nn.Module):
             embedding_dim, num_heads, p_dropout
         )
         self.norm1 = nn.LayerNorm(embedding_dim)
-        self.norm1.qconfig = None
         self.dropout1 = nn.Dropout(p_dropout)
 
         self.cross_attn_token_to_image = AttentionForTwoWayAttentionBlock(
@@ -157,7 +155,6 @@ class TwoWayAttentionBlock(nn.Module):
             downsample_rate=attention_downsample_rate,
         )
         self.norm2 = nn.LayerNorm(embedding_dim)
-        self.norm2.qconfig = None
         self.dropout2 = nn.Dropout(p_dropout)
 
         self.quant_input_mlp = torch.ao.quantization.QuantStub()
@@ -171,11 +168,9 @@ class TwoWayAttentionBlock(nn.Module):
         self.dequant_output_mlp = torch.ao.quantization.DeQuantStub()
 
         self.norm3 = nn.LayerNorm(embedding_dim)
-        self.norm3.qconfig = None
         self.dropout3 = nn.Dropout(p_dropout)
 
         self.norm4 = nn.LayerNorm(embedding_dim)
-        self.norm4.qconfig = None
         self.cross_attn_image_to_token = AttentionForTwoWayAttentionBlock(
             embedding_dim,
             num_heads,
@@ -185,7 +180,6 @@ class TwoWayAttentionBlock(nn.Module):
 
         self.skip_first_layer_pe = skip_first_layer_pe
 
-    # Refer https://www.internalfb.com/code/fbsource/[1caffe8318fe6916923c9eaa984221deb72752f4]/fbcode/deeplearning/projects/segmenting_everything/segment_everything/modeling/transformer/transformer.py
     def forward(
         self, queries: Tensor, keys: Tensor, query_pe: Tensor, key_pe: Tensor
     ) -> Tuple[Tensor, Tensor]:
@@ -248,19 +242,8 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
         self.v_dropout = nn.Dropout(proj_dropout)
         self.attn_dropout = nn.Dropout(attn_dropout)
         self.out_proj = nn.Linear(self.internal_dim, embedding_dim)
-        self.out_proj.qconfig = None
         self.out_dropout = nn.Dropout(proj_dropout)
         self._reset_parameters()
-
-        # Quant/Dequant stubs
-
-        self.quant_q = torch.ao.quantization.QuantStub()
-        self.quant_k = torch.ao.quantization.QuantStub()
-        self.quant_v = torch.ao.quantization.QuantStub()
-
-        self.dequant_q = torch.ao.quantization.DeQuantStub()
-        self.dequant_k = torch.ao.quantization.DeQuantStub()
-        self.dequant_v = torch.ao.quantization.DeQuantStub()
 
     def _reset_parameters(self) -> None:
         # The fan_out is incorrect, but matches pytorch's initialization
@@ -290,18 +273,14 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
 
     def forward(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
         # Input projections
-        q = self.q_dropout(self.q_proj(self.quant_q(q)))
-        k = self.k_dropout(self.k_proj(self.quant_k(k)))
-        v = self.v_dropout(self.v_proj(self.quant_v(v)))
+        q = self.q_dropout(self.q_proj(q))
+        k = self.k_dropout(self.k_proj(k))
+        v = self.v_dropout(self.v_proj(v))
 
         # Separate into heads
         q = self._separate_heads(q, self.num_heads)
         k = self._separate_heads(k, self.num_heads)
         v = self._separate_heads(v, self.num_heads)
-
-        q = self.dequant_q(q)
-        k = self.dequant_k(k)
-        v = self.dequant_v(v)
 
         # Attention
         _, _, _, c_per_head = q.shape
@@ -326,9 +305,6 @@ class Sam(nn.Module):
         prompt_encoder: PromptEncoder,
         decoder_max_num_input_points: int,
         mask_decoder: MaskDecoder,
-        fusion_type: str,
-        apply_softmax_on_iou_predictions: bool,
-        user_input_circle_radius: float,
         pixel_mean: List[float] = [0.485, 0.456, 0.406],
         pixel_std: List[float] = [0.229, 0.224, 0.225],
     ) -> None:
@@ -341,9 +317,6 @@ class Sam(nn.Module):
           prompt_encoder (PromptEncoder): Encodes various types of input prompts.
           mask_decoder (MaskDecoder): Predicts masks from the image embeddings
             and encoded prompts.
-          fusion_type: Either 'early', 'late' or 'hybrid'.
-          apply_softmax_on_iou_predictions: Whether to predict classification probabilities instead of IOU scores.
-          user_input_circle_radius: Radius of the circle used to encode user points in early fusion.
           pixel_mean (list(float)): Mean values for normalizing pixels in the input image.
           pixel_std (list(float)): Std values for normalizing pixels in the input image.
         """
@@ -352,9 +325,6 @@ class Sam(nn.Module):
         self.prompt_encoder = prompt_encoder
         self.decoder_max_num_input_points = decoder_max_num_input_points
         self.mask_decoder = mask_decoder
-        self.fusion_type = fusion_type
-        self.apply_softmax_on_iou_predictions = apply_softmax_on_iou_predictions
-        self.user_input_circle_radius = user_input_circle_radius
         self.register_buffer(
             "pixel_mean", torch.Tensor(pixel_mean).view(1, 3, 1, 1), False
         )
@@ -434,8 +404,6 @@ class Sam(nn.Module):
             sparse_prompt_embeddings=sparse_embeddings,
             multimask_output=multimask_output,
         )
-        if self.apply_softmax_on_iou_predictions:
-            iou_predictions = F.softmax(iou_predictions, dim=-1)
         _, num_predictions, low_res_size, _ = low_res_masks.shape
 
         if output_w > 0 and output_h > 0:
@@ -482,100 +450,6 @@ class Sam(nn.Module):
             dim=-1,
         )
 
-    @torch.jit.export
-    def add_user_inputs_as_separate_channels(
-        self,
-        batched_images: torch.Tensor,
-        batched_points: torch.Tensor,
-        batched_point_labels: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        This function creates a rectangular mask corresponding to the input bounding box and adds as a separate channel.
-        If no bounding box is found in the query, mask for the entire image is created by default.
-        Arguments:
-          batched_images: A tensor of shape [B, 3, H, W]
-          batched_points: A tensor of shape [B, max_num_queries, max_num_pts, 2]
-          batched_point_labels: A tensor of shape [B, max_num_queries, max_num_pts]
-
-        Returns:
-          A tensor of shape [B, max_num_queries, 4, H, W] after augmenting the bbox_mask as the fourth channel.
-        """
-        assert (
-            self.H > 0 and self.W > 0
-        ), "preprocess must be called before calling this function."
-        rescaled_batched_points = self.get_rescaled_pts(batched_points)
-        batch_size, _, h, w = batched_images.shape
-        max_num_queries = rescaled_batched_points.shape[1]
-        device = batched_images.device
-        row_ids = torch.arange(h, device=device)
-        col_ids = torch.arange(w, device=device)
-        row_ids = torch.tile(
-            torch.reshape(row_ids, (1, 1, h, 1)),
-            (batch_size, max_num_queries, 1, w),
-        )
-        col_ids = torch.tile(
-            torch.reshape(col_ids, (1, 1, 1, w)),
-            (batch_size, max_num_queries, h, 1),
-        )
-        is_bbox = torch.ne(batched_point_labels[:, :, 0], 1).float()
-        # Use (0,0) as the top left corner if no bbox is found in the query (is_bbox=False).
-        top_left_x = (
-            is_bbox * torch.min(rescaled_batched_points[:, :, :2, 0], dim=-1).values
-        )
-        top_left_y = (
-            is_bbox * torch.min(rescaled_batched_points[:, :, :2, 1], dim=-1).values
-        )
-
-        # Use (w,h) as the bottom right corner if no bbox is found in the query (is_bbox=False).
-        bottom_right_x = (
-            is_bbox * torch.max(rescaled_batched_points[:, :, :2, 0], dim=-1).values
-            + (1 - is_bbox) * w
-        )
-        bottom_right_y = (
-            is_bbox * torch.max(rescaled_batched_points[:, :, :2, 1], dim=-1).values
-            + (1 - is_bbox) * h
-        )
-        row_within = torch.logical_and(
-            torch.ge(row_ids, top_left_y[..., None, None]),
-            torch.le(row_ids, bottom_right_y[..., None, None]),
-        )
-        col_within = torch.logical_and(
-            torch.ge(col_ids, top_left_x[..., None, None]),
-            torch.le(col_ids, bottom_right_x[..., None, None]),
-        )
-        bbox_mask = torch.logical_and(row_within, col_within)
-        is_point = torch.eq(batched_point_labels, 1).float()[:, :, None, None, :]
-        # cols_and_rows is B, Q, h, w, 2
-        # rescaled_batched_points is [B, Q, max_num_pts, 2]
-        cols_and_rows = torch.stack([col_ids, row_ids], dim=-1)
-        user_input_circle_radius = self.user_input_circle_radius
-        user_input_pts_mask = torch.le(
-            torch.min(
-                torch.sum(
-                    torch.square(
-                        cols_and_rows[:, :, :, :, None, :]
-                        - rescaled_batched_points[:, :, None, None, :, :]
-                    ),
-                    dim=-1,
-                )
-                * is_point
-                + (1 - is_point)
-                * (user_input_circle_radius * user_input_circle_radius + 1),
-                dim=-1,
-            ).values,
-            user_input_circle_radius * user_input_circle_radius,
-        )
-        batched_images = torch.tile(
-            batched_images[:, None, :, :, :], [1, max_num_queries, 1, 1, 1]
-        )
-        return torch.cat(
-            [
-                batched_images,
-                bbox_mask[:, :, None, :, :],
-                user_input_pts_mask[:, :, None, :, :],
-            ],
-            dim=2,
-        )
 
     @torch.jit.export
     def get_image_embeddings(self, batched_images) -> List[torch.Tensor]:
@@ -591,30 +465,6 @@ class Sam(nn.Module):
           The last embedding corresponds to the final layer.
         """
         batched_images = self.preprocess(batched_images)
-        return self.image_encoder(batched_images)
-
-    @torch.jit.export
-    def get_image_embeddings_with_early_fusion(
-        self, batched_images, batched_points, batched_point_labels
-    ) -> List[torch.Tensor]:
-        """
-        Gets image embeddings after adding bbox and points as separate channels.
-
-        Arguments:
-          batched_images: A tensor of shape [B, 3, H, W]
-        Returns:
-          List of image embeddings each of of shape [B, C(i), H(i), W(i)].
-          The last embedding corresponds to the final layer.
-        """
-        batched_images = self.preprocess(batched_images)
-        batch_size, _, H, W = batched_images.shape
-        max_num_queries = batched_points.shape[1]
-        batched_images = self.add_user_inputs_as_separate_channels(
-            batched_images, batched_points, batched_point_labels
-        )
-        batched_images = torch.reshape(
-            batched_images, [batch_size * max_num_queries, 5, H, W]
-        )
         return self.image_encoder(batched_images)
 
     def forward(
@@ -640,13 +490,7 @@ class Sam(nn.Module):
             iou_predictions: A tensor of shape [B, max_num_queries] of estimated IOU scores
         """
         batch_size, _, _, _ = batched_images.shape
-        if self.fusion_type == "early" or self.fusion_type == "hybrid":
-            image_embeddings = self.get_image_embeddings_with_early_fusion(
-                batched_images, batched_points, batched_point_labels
-            )
-        else:
-            image_embeddings = self.get_image_embeddings(batched_images)
-
+        image_embeddings = self.get_image_embeddings(batched_images)
         return self.predict_masks(
             image_embeddings,
             batched_points,
@@ -671,64 +515,6 @@ class Sam(nn.Module):
             )
         return (x - self.pixel_mean) / self.pixel_std
 
-    def get_fused_model(self):
-        module_names = []
-        types = []
-        layers_fused = []
-        for name, m in self.named_modules():
-            module_names.append(name)
-            layers_fused.append(False)
-            if isinstance(m, nn.Conv2d):
-                types.append("conv")
-            elif isinstance(m, nn.Linear):
-                types.append("linear")
-            elif isinstance(m, nn.BatchNorm2d):
-                types.append("bn")
-            elif isinstance(m, nn.ReLU):
-                types.append("relu")
-            else:
-                types.append("unknown")
-        # print(module_names)
-        # print(types)
-        num_modules = len(module_names)
-        modules_to_fuse = []
-        for idx in range(num_modules - 1):
-            if (
-                idx <= num_modules - 3
-                and types[idx] == "conv"
-                and types[idx + 1] == "bn"
-                and types[idx + 2] == "relu"
-            ):
-                modules_to_fuse.append(
-                    [
-                        str(module_names[idx]),
-                        str(module_names[idx + 1]),
-                        str(module_names[idx + 2]),
-                    ]
-                )
-                layers_fused[idx + 1] = True
-            elif types[idx] == "conv" and types[idx + 1] == "bn":
-                modules_to_fuse.append(
-                    [str(module_names[idx]), str(module_names[idx + 1])]
-                )
-                layers_fused[idx + 1] = True
-            elif types[idx] == "conv" and types[idx + 1] == "relu":
-                modules_to_fuse.append(
-                    [str(module_names[idx]), str(module_names[idx + 1])]
-                )
-                layers_fused[idx + 1] = True
-            elif types[idx] == "linear" and types[idx + 1] == "relu":
-                modules_to_fuse.append(
-                    [str(module_names[idx]), str(module_names[idx + 1])]
-                )
-                layers_fused[idx + 1] = True
-        # print(modules_to_fuse)
-
-        if len(modules_to_fuse):
-            return torch.ao.quantization.fuse_modules(self, modules_to_fuse)
-        else:
-            return self
-
 
 def build_efficient_sam(checkpoint=None, device='cpu'):
     img_size = 1024
@@ -747,9 +533,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     num_multimask_outputs = 3
     iou_head_depth = 3
     iou_head_hidden_dim = 256
-    fusion_type = "late"
-    apply_softmax_on_iou_predictions = False
-    user_input_circle_radius = 5.0
     activation = "gelu"
     normalization_type = "layer_norm"
     normalize_before_activation = False
@@ -805,9 +588,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
             upscaling_layer_dims=decoder_upscaling_layer_dims,
             share_hypernetwork_mlp_weights=share_hypernetwork_mlp_weights,
         ),
-        fusion_type=fusion_type,
-        apply_softmax_on_iou_predictions=apply_softmax_on_iou_predictions,
-        user_input_circle_radius=user_input_circle_radius,
         pixel_mean=[0.485, 0.456, 0.406],
         pixel_std=[0.229, 0.224, 0.225],
     )
