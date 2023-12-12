@@ -34,14 +34,13 @@ class PatchEmbed(nn.Module):
 
     def __init__(
             self,
-            img_size: Optional[int] = 224,
-            patch_size: int = 16,
-            in_chans: int = 3,
-            embed_dim: int = 768,
-            bias: bool = True,
+            img_size,
+            patch_size,
+            in_chans,
+            embed_dim,
     ):
         super().__init__()
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=(patch_size, patch_size), stride=(patch_size, patch_size), bias=bias)
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=(patch_size, patch_size), stride=(patch_size, patch_size), bias=True)
 
     def forward(self, x):
         B, C, H, W = x.shape
@@ -204,20 +203,12 @@ class ImageEncoderViT(nn.Module):
         patch_size: int,
         in_chans: int,
         patch_embed_dim: int,
-        patch_embed_apply_norm: bool,
         normalization_type: str,
-        unet_conv_dims: List[int],
         depth: int,
         num_heads: int,
-        use_rel_pos: bool,
         mlp_ratio: float,
-        drop_path_rate: float,
         neck_dims: List[int],
         act_layer: Type[nn.Module],
-        normalize_before_activation: bool,
-        window_size: int,
-        global_attn_indexes: Tuple[int, ...] = (),
-        apply_feature_pyramid: bool = False,
     ) -> None:
         """
         Args:
@@ -237,30 +228,26 @@ class ImageEncoderViT(nn.Module):
         self.transformer_output_dim = ([patch_embed_dim] + neck_dims)[-1]
         self.pretrain_use_cls_token = True
 
-        patch_size = 16
-        embed_dim = 192
-
         pretrain_img_size = 224
-        img_size = 1024
 
-        self.patch_embed = PatchEmbed(img_size, patch_size, 3, embed_dim)
+        self.patch_embed = PatchEmbed(img_size, patch_size, 3, patch_embed_dim)
 
         # Initialize absolute positional embedding with pretrain image size.
         num_patches = (pretrain_img_size // patch_size) * (
             pretrain_img_size // patch_size
         )
         num_positions = num_patches + 1
-        self.pos_embed = nn.Parameter(torch.zeros(1, num_positions, embed_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_positions, patch_embed_dim))
 
         self.blocks = nn.ModuleList()
         for i in range(depth):
-            vit_block = Block(192, 12, 4, True)
+            vit_block = Block(patch_embed_dim, num_heads, mlp_ratio, True)
             self.blocks.append(vit_block)
 
 
         self.neck = nn.Sequential(
             nn.Conv2d(
-                embed_dim,
+                patch_embed_dim,
                 neck_dims[0],
                 kernel_size=1,
                 bias=False,

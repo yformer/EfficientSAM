@@ -377,7 +377,6 @@ class MaskDecoder(nn.Module):
         normalize_before_activation: bool,
         iou_head_depth: int,
         iou_head_hidden_dim: int,
-        unet_conv_dims: List[int],
         upscaling_layer_dims: List[int],
         share_hypernetwork_mlp_weights: bool,
     ) -> None:
@@ -410,19 +409,7 @@ class MaskDecoder(nn.Module):
             self.num_mask_tokens = 1
         self.mask_tokens = nn.Embedding(self.num_mask_tokens, transformer_dim)
         output_dim_after_upscaling = transformer_dim
-        self.unet_upscaling_layers = nn.ModuleList([])
-        for unet_layer_dim in unet_conv_dims:
-            self.unet_upscaling_layers.append(
-                Up(
-                    output_dim_after_upscaling,
-                    unet_layer_dim,
-                    unet_layer_dim,
-                    activation,
-                    normalization_type,
-                    normalize_before_activation,
-                )
-            )
-            output_dim_after_upscaling = unet_layer_dim
+
 
         self.final_output_upscaling_layers = nn.ModuleList([])
         for idx, layer_dims in enumerate(upscaling_layer_dims):
@@ -567,15 +554,6 @@ class MaskDecoder(nn.Module):
 
         # Upscale mask embeddings and predict masks using the mask tokens
         upscaled_embedding = src.transpose(1, 2).view(b, c, h, w)
-        # the first Up layer is not meaningful to take in the last embedding from image_embeddings
-        # since it takes in the last embedding from the encoder and its derivative from the decoder transformer.
-        # Instead it should be a skip connection to the earlier embedding.
-        down_conv_embeddings = image_embeddings[:-1]
-        down_conv_embeddings.reverse()
-        for idx, upscaling_layer in enumerate(self.unet_upscaling_layers):
-            upscaled_embedding = upscaling_layer(
-                upscaled_embedding, down_conv_embeddings[idx]
-            )
 
         for upscaling_layer in self.final_output_upscaling_layers:
             upscaled_embedding = upscaling_layer(upscaled_embedding)

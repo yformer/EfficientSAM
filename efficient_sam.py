@@ -734,19 +734,10 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     img_size = 1024
     encoder_patch_size = 16
     encoder_patch_embed_dim = 192
-    encoder_patch_embed_apply_norm = False
-    encoder_unet_conv_dims = []
     encoder_depth = 12
-    encoder_num_heads = 3
-    encoder_use_rel_pos = False
+    encoder_num_heads = 12
     encoder_mlp_ratio = 4.0
-    encoder_drop_path_rate = 0.4
     encoder_neck_dims = [256, 256]
-    encoder_window_size = 0
-    encoder_global_attn_indexes = []
-    encoder_apply_feature_pyramid = False
-    encoder_use_metanet = False
-    encoder_metanet_name = "metanetv6_vit_237M_wopool"
     decoder_max_num_input_points = 6
     decoder_transformer_depth = 2
     decoder_transformer_mlp_dim = 2048
@@ -764,46 +755,23 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     normalize_before_activation = False
     share_hypernetwork_mlp_weights = False
 
-    assert (
-        img_size
-        % (
-            (encoder_patch_size if encoder_patch_size > 0 else 1)
-            * (int(2 ** len(encoder_unet_conv_dims)) if encoder_unet_conv_dims else 1)
-        )
-        == 0
-    ), "image size should be divisible by patch_size * (2**len(patch_down_conv_dims))"
-
-    decoder_unet_conv_dims = list(reversed(encoder_unet_conv_dims))[1:]
     assert activation == "relu" or activation == "gelu"
     if activation == "relu":
         activation_fn = nn.ReLU
     else:
         activation_fn = nn.GELU
 
-    assert fusion_type == "early" or fusion_type == "late" or fusion_type == "hybrid"
-    early_fusion = fusion_type == "early" or fusion_type == "hybrid"
-
-    late_fusion = fusion_type == "late" or fusion_type == "hybrid"
-
     image_encoder = ImageEncoderViT(
         img_size=img_size,
         patch_size=encoder_patch_size,
-        in_chans=5 if early_fusion else 3,
+        in_chans=3,
         patch_embed_dim=encoder_patch_embed_dim,
-        patch_embed_apply_norm=encoder_patch_embed_apply_norm,
         normalization_type=normalization_type,
-        unet_conv_dims=encoder_unet_conv_dims,
         depth=encoder_depth,
         num_heads=encoder_num_heads,
-        use_rel_pos=encoder_use_rel_pos,
         mlp_ratio=encoder_mlp_ratio,
-        drop_path_rate=encoder_drop_path_rate,
         neck_dims=encoder_neck_dims,
         act_layer=activation_fn,
-        normalize_before_activation=normalize_before_activation,
-        window_size=encoder_window_size,
-        global_attn_indexes=encoder_global_attn_indexes,
-        apply_feature_pyramid=encoder_apply_feature_pyramid,
     )
 
     image_embedding_size = image_encoder.image_embedding_size
@@ -815,11 +783,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
             embed_dim=encoder_transformer_output_dim,
             image_embedding_size=(image_embedding_size, image_embedding_size),
             input_image_size=(img_size, img_size),
-        )
-        if late_fusion
-        else NullPromptEncoder(
-            embed_dim=encoder_transformer_output_dim,
-            image_embedding_size=(image_embedding_size, image_embedding_size),
         ),
         decoder_max_num_input_points=decoder_max_num_input_points,
         mask_decoder=MaskDecoder(
@@ -839,7 +802,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
             normalize_before_activation=normalize_before_activation,
             iou_head_depth=iou_head_depth - 1,
             iou_head_hidden_dim=iou_head_hidden_dim,
-            unet_conv_dims=decoder_unet_conv_dims,
             upscaling_layer_dims=decoder_upscaling_layer_dims,
             share_hypernetwork_mlp_weights=share_hypernetwork_mlp_weights,
         ),
@@ -858,6 +820,5 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
 
 
 
-sam = build_efficient_sam('model_ckpt.pth')
 
-print(sam)
+# Run on a single image
