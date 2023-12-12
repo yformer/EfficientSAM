@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 from torch import nn, Tensor
 
-from mlp import MLPBlock
+from .mlp import MLPBlock
 from .efficient_sam_decoder import MaskDecoder, PromptEncoder
 from .efficient_sam_encoder import ImageEncoderViT
 
