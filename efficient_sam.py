@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 
 from mlp import MLPBlock
-from efficient_sam_decoder import MaskDecoder, NullPromptEncoder, PromptEncoder
+from efficient_sam_decoder import MaskDecoder, PromptEncoder
 from efficient_sam_encoder import ImageEncoderViT
 
 
@@ -425,10 +425,13 @@ class Sam(nn.Module):
                     low_res_size,
                 ),
             )
-
-        return output_masks, torch.reshape(
+        iou_predictions = torch.reshape(
             iou_predictions, (batch_size, max_num_queries, num_predictions)
         )
+        sorted_ids = torch.argsort(iou_predictions, dim=-1, descending=True)
+        iou_predictions = torch.take_along_dim(iou_predictions, sorted_ids, dim=2)
+        output_masks = torch.take_along_dim(output_masks, sorted_ids[...,None,None], dim=2)
+        return output_masks, iou_predictions
 
     def get_rescaled_pts(self, batched_points):
         assert (

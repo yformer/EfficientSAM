@@ -11,7 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from mlp import MLPBlock
-from efficient_sam_decoder import ConvTranspose2dUsingLinear, DoubleConv, Down
 
 class LayerNorm2d(nn.Module):
     def __init__(self, num_channels: int, eps: float = 1e-6) -> None:
@@ -183,7 +182,6 @@ def get_abs_pos(abs_pos, has_cls_token, hw):
             mode="bicubic",
             align_corners=False,
         )
-
         return new_abs_pos.permute(0, 2, 3, 1)
     else:
         return abs_pos.reshape(1, h, w, -1)
