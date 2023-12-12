@@ -3,14 +3,19 @@ from PIL import Image
 from torchvision import transforms
 import torch
 import numpy as np
+import zipfile
+
+
 
 models = {}
 # Build the VIT-tiny model.
 models['vitt'] = build_efficient_sam_vitt()
 
-
+# Since VIT-small is >100MB, we store the zip file.
+with zipfile.ZipFile("weights/efficient_sam_vits.pt.zip", 'r') as zip_ref:
+    zip_ref.extractall("weights")
 # # Build the VIT-small model.
-# models['vits'] = build_efficient_sam_vits()
+models['vits'] = build_efficient_sam_vits()
 
 # load an image
 sample_image_np = np.array(Image.open("figs/examples/dogs.jpg"))
@@ -23,7 +28,6 @@ input_labels = torch.tensor([[[1, 1]]])
 # Run inference for both vitt and vits based models.
 for model_name, efficient_sam in models.items():
     print('Running inference using ', model_name)
-    efficient_sam.half()
     predicted_logits, predicted_iou = efficient_sam(
         sample_image_tensor[None, ...],
         input_points,
