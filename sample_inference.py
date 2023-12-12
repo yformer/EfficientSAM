@@ -5,7 +5,7 @@ import torch
 import numpy as np
 
 # Build the model.
-efficient_sam = build_efficient_sam('model_ckpt.pth')
+efficient_sam = build_efficient_sam('weights/efficient_sam_vitt.pth')
 efficient_sam.eval()
 
 # load an image
