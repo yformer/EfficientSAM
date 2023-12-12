@@ -20,13 +20,13 @@ Segment everything |![segment everything](figs/examples/demo_everything.png)
 Saliency | ![Saliency](figs/examples/demo_saliency.png)
 
 ## Model
-The weights file based on VIT-tiny and VIT-small are available under the weights folder of this github repository. Example instantiations and run of the models can be found in [EfficientSAM_example.py](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py).
+The weights files for EfficientSAM are available under the weights folder of this github repository. Example instantiations and run of the models can be found in [EfficientSAM_example.py](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py).
 
 | EfficientSAM-S | EfficientSAM-Ti |
 |------------------------------|------------------------------|
 | [Download](https://github.com/yformer/EfficientSAM/blob/main/weights/efficient_sam_vits.pt.zip) |[Download](https://github.com/yformer/EfficientSAM/blob/main/weights/efficient_sam_vitt.pt)|
 
-You can directly use EfficientSAM,
+You can directly use EfficientSAM with checkpoints,
 ```
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
 efficient_sam_vit = build_efficient_sam_vitt()
