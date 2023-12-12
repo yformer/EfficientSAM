@@ -12,9 +12,10 @@ import torch.nn.functional as F
 
 from torch import nn, Tensor
 
-from .mlp import MLPBlock
 from .efficient_sam_decoder import MaskDecoder, PromptEncoder
 from .efficient_sam_encoder import ImageEncoderViT
+
+from .mlp import MLPBlock
 
 
 class TwoWayTransformer(nn.Module):
@@ -138,9 +139,7 @@ class TwoWayAttentionBlock(nn.Module):
           skip_first_layer_pe (bool): skip the PE on the first layer
         """
         super().__init__()
-        self.self_attn = AttentionForTwoWayAttentionBlock(
-            embedding_dim, num_heads
-        )
+        self.self_attn = AttentionForTwoWayAttentionBlock(embedding_dim, num_heads)
         self.norm1 = nn.LayerNorm(embedding_dim)
 
         self.cross_attn_token_to_image = AttentionForTwoWayAttentionBlock(
@@ -318,7 +317,7 @@ class Sam(nn.Module):
     @torch.jit.export
     def predict_masks(
         self,
-        image_embeddings: List[torch.Tensor],
+        image_embeddings: torch.Tensor,
         batched_points: torch.Tensor,
         batched_point_labels: torch.Tensor,
         multimask_output: bool,
@@ -407,7 +406,9 @@ class Sam(nn.Module):
         )
         sorted_ids = torch.argsort(iou_predictions, dim=-1, descending=True)
         iou_predictions = torch.take_along_dim(iou_predictions, sorted_ids, dim=2)
-        output_masks = torch.take_along_dim(output_masks, sorted_ids[...,None,None], dim=2)
+        output_masks = torch.take_along_dim(
+            output_masks, sorted_ids[..., None, None], dim=2
+        )
         return output_masks, iou_predictions
 
     def get_rescaled_pts(self, batched_points):
@@ -430,9 +431,8 @@ class Sam(nn.Module):
             dim=-1,
         )
 
-
     @torch.jit.export
-    def get_image_embeddings(self, batched_images) -> List[torch.Tensor]:
+    def get_image_embeddings(self, batched_images) -> torch.Tensor:
         """
         Predicts masks end-to-end from provided images and prompts.
         If prompts are not known in advance, using SamPredictor is
@@ -496,12 +496,10 @@ class Sam(nn.Module):
         return (x - self.pixel_mean) / self.pixel_std
 
 
-def build_efficient_sam(checkpoint=None, device='cpu'):
+def build_efficient_sam(encoder_patch_embed_dim, encoder_num_heads, checkpoint=None):
     img_size = 1024
     encoder_patch_size = 16
-    encoder_patch_embed_dim = 192
     encoder_depth = 12
-    encoder_num_heads = 12
     encoder_mlp_ratio = 4.0
     encoder_neck_dims = [256, 256]
     decoder_max_num_input_points = 6
@@ -569,7 +567,23 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     )
     if checkpoint is not None:
         with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f,map_location='cpu')
-        sam.load_state_dict(state_dict['model'])
-    sam.to(torch.device(device))
+            state_dict = torch.load(f, map_location="cpu")
+        sam.load_state_dict(state_dict["model"])
+    sam
     return sam
+
+
+def build_efficient_sam_vitt():
+    return build_efficient_sam(
+        encoder_patch_embed_dim=192,
+        encoder_num_heads=3,
+        checkpoint="weights/efficient_sam_vitt.pt",
+    ).eval()
+
+
+def build_efficient_sam_vits():
+    return build_efficient_sam(
+        encoder_patch_embed_dim=384,
+        encoder_num_heads=6,
+        checkpoint="weights/efficient_sam_vits.pt",
+    ).eval()

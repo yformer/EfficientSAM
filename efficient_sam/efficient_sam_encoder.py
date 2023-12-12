@@ -4,13 +4,15 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import math
 from typing import List, Optional, Tuple, Type
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
+
 from .mlp import MLPBlock
+
 
 class LayerNorm2d(nn.Module):
     def __init__(self, num_channels: int, eps: float = 1e-6) -> None:
@@ -28,18 +30,23 @@ class LayerNorm2d(nn.Module):
 
 
 class PatchEmbed(nn.Module):
-    """ 2D Image to Patch Embedding
-    """
+    """2D Image to Patch Embedding"""
 
     def __init__(
-            self,
-            img_size,
-            patch_size,
-            in_chans,
-            embed_dim,
+        self,
+        img_size,
+        patch_size,
+        in_chans,
+        embed_dim,
     ):
         super().__init__()
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=(patch_size, patch_size), stride=(patch_size, patch_size), bias=True)
+        self.proj = nn.Conv2d(
+            in_chans,
+            embed_dim,
+            kernel_size=(patch_size, patch_size),
+            stride=(patch_size, patch_size),
+            bias=True,
+        )
 
     def forward(self, x):
         B, C, H, W = x.shape
@@ -47,21 +54,18 @@ class PatchEmbed(nn.Module):
         return x
 
 
-
-
 class Attention(nn.Module):
     def __init__(
         self,
         dim,
-        num_heads=8,
-        qkv_bias=False,
+        num_heads,
+        qkv_bias,
         qk_scale=None,
     ):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
         self.scale = qk_scale or head_dim**-0.5
-
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(dim, dim)
 
@@ -77,10 +81,8 @@ class Attention(nn.Module):
             qkv[1],
             qkv[2],
         )  # make torchscript happy (cannot use tensor as tuple)
-
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
-
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         return x
@@ -117,29 +119,33 @@ class Block(nn.Module):
         qkv_bias=False,
         qk_scale=None,
         act_layer=nn.GELU,
-        norm_layer=nn.LayerNorm,
     ):
         super().__init__()
-        self.norm1 = norm_layer(dim)
+        self.norm1 = nn.LayerNorm(dim, eps=1e-6)
         self.attn = Attention(
             dim,
             num_heads=num_heads,
             qkv_bias=qkv_bias,
             qk_scale=qk_scale,
         )
-        self.norm2 = norm_layer(dim)
+        self.norm2 = nn.LayerNorm(dim, eps=1e-6)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(
             in_features=dim,
             hidden_features=mlp_hidden_dim,
             act_layer=act_layer,
         )
+
     def forward(self, x):
         x = x + self.attn(self.norm1(x))
         x = x + self.mlp(self.norm2(x))
         return x
 
-def get_abs_pos(abs_pos, has_cls_token, hw):
+
+@torch.jit.export
+def get_abs_pos(
+    abs_pos: torch.Tensor, has_cls_token: bool, hw: List[int]
+) -> torch.Tensor:
     """
     Calculate absolute positional embeddings. If needed, resize embeddings and remove cls_token
         dimension for the original embeddings.
@@ -151,7 +157,8 @@ def get_abs_pos(abs_pos, has_cls_token, hw):
     Returns:
         Absolute positional embeddings after processing with shape (1, H, W, C)
     """
-    h, w = hw
+    h = hw[0]
+    w = hw[1]
     if has_cls_token:
         abs_pos = abs_pos[:, 1:]
     xy_num = abs_pos.shape[1]
@@ -232,18 +239,16 @@ class ImageEncoderViT(nn.Module):
             LayerNorm2d(neck_dims[0]),
         )
 
-
-    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         assert (
             x.shape[2] == self.img_size and x.shape[3] == self.img_size
         ), "input image size must match self.img_size"
         x = self.patch_embed(x)
         # B C H W -> B H W C
         x = x.permute(0, 2, 3, 1)  # vit det block takes BHWC as input
-        if self.pos_embed is not None:
-            x = x + get_abs_pos(
-                self.pos_embed, self.pretrain_use_cls_token, (x.shape[1], x.shape[2])
-            )
+        x = x + get_abs_pos(
+            self.pos_embed, self.pretrain_use_cls_token, [x.shape[1], x.shape[2]]
+        )
         num_patches = x.shape[1]
         assert x.shape[2] == num_patches
         x = x.reshape(x.shape[0], num_patches * num_patches, x.shape[3])

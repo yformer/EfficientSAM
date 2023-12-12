@@ -88,6 +88,7 @@ class PromptEncoder(nn.Module):
         """
         return self._embed_points(coords, labels)
 
+
 class PositionEmbeddingRandom(nn.Module):
     """
     Positional encoding using random spatial frequencies.
@@ -129,7 +130,6 @@ class PositionEmbeddingRandom(nn.Module):
         coords[:, :, 0] = coords[:, :, 0] / image_size[1]
         coords[:, :, 1] = coords[:, :, 1] / image_size[0]
         return self._pe_encoding(coords.to(torch.float))  # B x N x C
-
 
 
 class MaskDecoder(nn.Module):
@@ -176,7 +176,6 @@ class MaskDecoder(nn.Module):
         self.mask_tokens = nn.Embedding(self.num_mask_tokens, transformer_dim)
         output_dim_after_upscaling = transformer_dim
 
-
         self.final_output_upscaling_layers = nn.ModuleList([])
         for idx, layer_dims in enumerate(upscaling_layer_dims):
             self.final_output_upscaling_layers.append(
@@ -215,7 +214,6 @@ class MaskDecoder(nn.Module):
             num_layers=iou_head_depth,
             act=activation,
         )
-
 
     def forward(
         self,
