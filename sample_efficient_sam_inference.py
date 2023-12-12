@@ -23,6 +23,7 @@ input_labels = torch.tensor([[[1, 1]]])
 # Run inference for both vitt and vits based models.
 for model_name, efficient_sam in models.items():
     print('Running inference using ', model_name)
+    efficient_sam.half()
     predicted_logits, predicted_iou = efficient_sam(
         sample_image_tensor[None, ...],
         input_points,
