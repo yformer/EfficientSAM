@@ -40,4 +40,4 @@ for model_name, efficient_sam in models.items():
     # For this demo we use the first mask.
     mask = torch.ge(predicted_logits[0, 0, 0, :, :], 0).cpu().detach().numpy()
     masked_image_np = sample_image_np.copy().astype(np.uint8) * mask[:,:,None]
-    Image.fromarray(masked_image_np).save(f"figs/examples/dogs_efficient_sam_{model_name}_mask.png")
+    Image.fromarray(masked_image_np).save(f"figs/examples/dogs_{model_name}_mask.png")
