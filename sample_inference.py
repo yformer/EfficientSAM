@@ -14,7 +14,7 @@ sample_image_tensor = transforms.ToTensor()(sample_image_np)
 # Feed a few (x,y) points in the mask as input.
 
 input_points = torch.tensor([[[[580, 350], [650, 350]]]])
-input_labels = torch.tensor([[1, 1]])
+input_labels = torch.tensor([[[1, 1]]])
 
 predicted_logits, predicted_iou = efficient_sam(
     sample_image_tensor[None, ...],
