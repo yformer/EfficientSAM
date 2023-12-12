@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple, Type
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import math
 from mlp import MLPBlock
 from efficient_sam_decoder import ConvTranspose2dUsingLinear, DoubleConv, Down
 
@@ -29,26 +29,26 @@ class LayerNorm2d(nn.Module):
 
 
 class PatchEmbed(nn.Module):
-    """ Image to Patch Embedding
+    """ 2D Image to Patch Embedding
     """
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, norm_layer=None):
-        super().__init__()
-        self.img_size = img_size
-        self.patch_size = patch_size
-        self.patch_grid = (img_size // patch_size, img_size // patch_size)
-        self.num_patches = self.patch_grid[0] * self.patch_grid[1]
 
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+    def __init__(
+            self,
+            img_size: Optional[int] = 224,
+            patch_size: int = 16,
+            in_chans: int = 3,
+            embed_dim: int = 768,
+            bias: bool = True,
+    ):
+        super().__init__()
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=(patch_size, patch_size), stride=(patch_size, patch_size), bias=bias)
 
     def forward(self, x):
         B, C, H, W = x.shape
-        # FIXME look at relaxing size constraints
-        assert H == self.img_size[0] and W == self.img_size[1], \
-            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        x = self.proj(x).flatten(2).transpose(1, 2)
-        x = self.norm(x)
+        x = self.proj(x)
         return x
+
+
 
 
 class Attention(nn.Module):
@@ -155,14 +155,48 @@ class Block(nn.Module):
         )
 
     def forward(self, x):
-        x = x + self.drop_path(self.attn(self.norm1(x)))
-        x = x + self.drop_path(self.mlp(self.norm2(x)))
+        x = x + self.attn(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
         return x
 
 
 
+def get_abs_pos(abs_pos, has_cls_token, hw):
+    """
+    Calculate absolute positional embeddings. If needed, resize embeddings and remove cls_token
+        dimension for the original embeddings.
+    Args:
+        abs_pos (Tensor): absolute positional embeddings with (1, num_position, C).
+        has_cls_token (bool): If true, has 1 embedding in abs_pos for cls token.
+        hw (Tuple): size of input image tokens.
 
-# This class and its supporting functions below lightly adapted from the ViTDet backbone available at: https://github.com/facebookresearch/detectron2/blob/main/detectron2/modeling/backbone/vit.py # noqa
+    Returns:
+        Absolute positional embeddings after processing with shape (1, H, W, C)
+    """
+    h, w = hw
+    if has_cls_token:
+        abs_pos = abs_pos[:, 1:]
+    xy_num = abs_pos.shape[1]
+    size = int(math.sqrt(xy_num))
+    assert size * size == xy_num
+
+    if size != h or size != w:
+        new_abs_pos = F.interpolate(
+            abs_pos.reshape(1, size, size, -1).permute(0, 3, 1, 2),
+            size=(h, w),
+            mode="bicubic",
+            align_corners=False,
+        )
+
+        return new_abs_pos.permute(0, 2, 3, 1)
+    else:
+        return abs_pos.reshape(1, h, w, -1)
+
+
+
+
+
+# Image encoder for efficient SAM.
 class ImageEncoderViT(nn.Module):
     def __init__(
         self,
@@ -201,6 +235,7 @@ class ImageEncoderViT(nn.Module):
         self.img_size = img_size
         self.image_embedding_size = img_size // ((patch_size if patch_size > 0 else 1))
         self.transformer_output_dim = ([patch_embed_dim] + neck_dims)[-1]
+        self.pretrain_use_cls_token = True
 
         patch_size = 16
         embed_dim = 192
@@ -209,8 +244,6 @@ class ImageEncoderViT(nn.Module):
         img_size = 1024
 
         self.patch_embed = PatchEmbed(img_size, patch_size, 3, embed_dim)
-
-
 
         # Initialize absolute positional embedding with pretrain image size.
         num_patches = (pretrain_img_size // patch_size) * (
@@ -249,7 +282,9 @@ class ImageEncoderViT(nn.Module):
             x.shape[2] == self.img_size and x.shape[3] == self.img_size
         ), "input image size must match self.img_size"
 
+        print('x=',x.shape)
         x = self.patch_embed(x)
+        print('x=',x.shape)
         # B C H W -> B H W C
         x = x.permute(0, 2, 3, 1)  # vit det block takes BHWC as input
         if self.pos_embed is not None:
@@ -257,9 +292,23 @@ class ImageEncoderViT(nn.Module):
                 self.pos_embed, self.pretrain_use_cls_token, (x.shape[1], x.shape[2])
             )
 
+        print('x=',x.shape)
+
+
+        num_patches = x.shape[1]
+        assert x.shape[2] == num_patches
+
+        x = x.reshape(x.shape[0], num_patches * num_patches, x.shape[3])
+        print('x=',x.shape)
+
         for blk in self.blocks:
             x = blk(x)
 
+        print('x=',x.shape)
+
+        x = x.reshape(x.shape[0], num_patches, num_patches, x.shape[2])
+
         x = self.neck(x.permute(0, 3, 1, 2))
+        print('x=',x.shape)
 
         return [x]
