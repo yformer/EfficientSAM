@@ -34,7 +34,7 @@ efficientsam = torch.jit.load(efficientsam_s_gpu.jit)
 ```
 
 ## Colab
-The colab is shared [here](https://colab.research.google.com/drive/150dvh_lwbliC3020fWO9qASgy-so6sUZ?usp=sharing)
+The colab is shared [here](https://github.com/yformer/EfficientSAM/blob/main/notebooks/EfficientSAM_example.ipynb)
 
 
 
