@@ -157,7 +157,6 @@ class TwoWayAttentionBlock(nn.Module):
         self.norm2 = nn.LayerNorm(embedding_dim)
         self.dropout2 = nn.Dropout(p_dropout)
 
-        self.quant_input_mlp = torch.ao.quantization.QuantStub()
         self.mlp = MLPBlock(
             embedding_dim,
             mlp_dim,
@@ -165,7 +164,6 @@ class TwoWayAttentionBlock(nn.Module):
             1,
             activation,
         )
-        self.dequant_output_mlp = torch.ao.quantization.DeQuantStub()
 
         self.norm3 = nn.LayerNorm(embedding_dim)
         self.dropout3 = nn.Dropout(p_dropout)
@@ -198,7 +196,7 @@ class TwoWayAttentionBlock(nn.Module):
         queries = self.norm2(queries)
 
         # MLP block
-        mlp_out = self.dequant_output_mlp(self.mlp(self.quant_input_mlp(queries)))
+        mlp_out = self.mlp(queries)
         queries = queries + self.dropout3(mlp_out)
         queries = self.norm3(queries)
 
@@ -539,7 +537,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     activation = "gelu"
     normalization_type = "layer_norm"
     normalize_before_activation = False
-    share_hypernetwork_mlp_weights = False
 
     assert activation == "relu" or activation == "gelu"
     if activation == "relu":
@@ -589,7 +586,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
             iou_head_depth=iou_head_depth - 1,
             iou_head_hidden_dim=iou_head_hidden_dim,
             upscaling_layer_dims=decoder_upscaling_layer_dims,
-            share_hypernetwork_mlp_weights=share_hypernetwork_mlp_weights,
         ),
         pixel_mean=[0.485, 0.456, 0.406],
         pixel_std=[0.229, 0.224, 0.225],

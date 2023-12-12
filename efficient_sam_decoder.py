@@ -148,7 +148,6 @@ class MaskDecoder(nn.Module):
         iou_head_depth: int,
         iou_head_hidden_dim: int,
         upscaling_layer_dims: List[int],
-        share_hypernetwork_mlp_weights: bool,
     ) -> None:
         """
         Predicts masks given an image and prompt embeddings, using a
@@ -198,30 +197,19 @@ class MaskDecoder(nn.Module):
                 )
             )
             output_dim_after_upscaling = layer_dims
-        if share_hypernetwork_mlp_weights:
-            mlp_block = MLPBlock(
-                input_dim=transformer_dim,
-                hidden_dim=transformer_dim,
-                output_dim=output_dim_after_upscaling,
-                num_layers=2,
-                act=activation,
-            )
-            self.output_hypernetworks_mlps = nn.ModuleList(
-                [mlp_block for i in range(self.num_mask_tokens)]
-            )
-        else:
-            self.output_hypernetworks_mlps = nn.ModuleList(
-                [
-                    MLPBlock(
-                        input_dim=transformer_dim,
-                        hidden_dim=transformer_dim,
-                        output_dim=output_dim_after_upscaling,
-                        num_layers=2,
-                        act=activation,
-                    )
-                    for i in range(self.num_mask_tokens)
-                ]
-            )
+
+        self.output_hypernetworks_mlps = nn.ModuleList(
+            [
+                MLPBlock(
+                    input_dim=transformer_dim,
+                    hidden_dim=transformer_dim,
+                    output_dim=output_dim_after_upscaling,
+                    num_layers=2,
+                    act=activation,
+                )
+                for i in range(self.num_mask_tokens)
+            ]
+        )
 
         self.iou_prediction_head = MLPBlock(
             input_dim=transformer_dim,
