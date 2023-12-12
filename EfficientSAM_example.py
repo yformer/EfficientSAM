@@ -1,4 +1,4 @@
-from efficient_sam.efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
+from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
 from PIL import Image
 from torchvision import transforms
 import torch
