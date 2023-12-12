@@ -11,7 +11,7 @@ models = {}
 # Build the EfficientSAM-Ti model.
 models['efficientsam_ti'] = build_efficient_sam_vitt()
 
-# Since EfficientSAM-S checkpoint is >100MB, we store the zip file.
+# Since EfficientSAM-S checkpoint file is >100MB, we store the zip file.
 with zipfile.ZipFile("weights/efficient_sam_vits.pt.zip", 'r') as zip_ref:
     zip_ref.extractall("weights")
 # # Build the EfficientSAM-S model.
@@ -25,7 +25,7 @@ sample_image_tensor = transforms.ToTensor()(sample_image_np)
 input_points = torch.tensor([[[[580, 350], [650, 350]]]])
 input_labels = torch.tensor([[[1, 1]]])
 
-# Run inference for both EfficientSAM-Ti and EfficientSAM-S based models.
+# Run inference for both EfficientSAM-Ti and EfficientSAM-S models.
 for model_name, efficient_sam in models.items():
     print('Running inference using ', model_name)
     predicted_logits, predicted_iou = efficient_sam(
