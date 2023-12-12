@@ -20,17 +20,16 @@ Segment everything |![segment everything](figs/examples/demo_everything.png)
 Saliency | ![Saliency](figs/examples/demo_saliency.png)
 
 ## Model
-Models for GPU/CPU are available at the file folder of [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM/).
+The weights file based on VIT-tiny and VIT-small are available under the weights folder of this github repository. Example instantiations and run of the models can be found in [EfficientSAM_example.py](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py).
 
 | EfficientSAM-S | EfficientSAM-Ti |
 |------------------------------|------------------------------|
-| [Download](https://www.dropbox.com/scl/fi/ziif8xudwbyyphb4tohza/efficientsam_s_gpu.jit?rlkey=8aflq9kf0bfujz5ex4lxuoq56&dl=0) |[Download](https://www.dropbox.com/scl/fi/lup5s4gthmlv6qf3f5zz3/efficientsam_ti_gpu.jit?rlkey=pap1xktxw50qiaey17no16bqz&dl=0)|
+| [Download](https://github.com/yformer/EfficientSAM/blob/main/weights/efficient_sam_vits.pt.zip) |[Download](https://github.com/yformer/EfficientSAM/blob/main/weights/efficient_sam_vitt.pt)|
 
 You can directly use EfficientSAM,
 ```
-import torch
-
-efficientsam = torch.jit.load(efficientsam_s_gpu.jit)
+from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
+efficient_sam_vit = build_efficient_sam_vitt()
 ```
 
 ## Colab
