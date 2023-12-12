@@ -24,7 +24,6 @@ class TwoWayTransformer(nn.Module):
         embedding_dim: int,
         num_heads: int,
         mlp_dim: int,
-        p_dropout: float,
         activation: Type[nn.Module],
         normalize_before_activation: bool,
         attention_downsample_rate: int = 2,
@@ -53,7 +52,6 @@ class TwoWayTransformer(nn.Module):
                 embedding_dim=embedding_dim,
                 num_heads=num_heads,
                 mlp_dim=mlp_dim,
-                p_dropout=p_dropout,
                 activation=activation,
                 normalize_before_activation=normalize_before_activation,
                 attention_downsample_rate=attention_downsample_rate,
@@ -64,7 +62,6 @@ class TwoWayTransformer(nn.Module):
         self.final_attn_token_to_image = AttentionForTwoWayAttentionBlock(
             embedding_dim,
             num_heads,
-            p_dropout,
             downsample_rate=attention_downsample_rate,
         )
         self.norm_final_attn = nn.LayerNorm(embedding_dim)
@@ -122,7 +119,6 @@ class TwoWayAttentionBlock(nn.Module):
         embedding_dim: int,
         num_heads: int,
         mlp_dim: int,
-        p_dropout: float,
         activation: Type[nn.Module],
         normalize_before_activation: bool,
         attention_downsample_rate: int = 2,
@@ -143,19 +139,16 @@ class TwoWayAttentionBlock(nn.Module):
         """
         super().__init__()
         self.self_attn = AttentionForTwoWayAttentionBlock(
-            embedding_dim, num_heads, p_dropout
+            embedding_dim, num_heads
         )
         self.norm1 = nn.LayerNorm(embedding_dim)
-        self.dropout1 = nn.Dropout(p_dropout)
 
         self.cross_attn_token_to_image = AttentionForTwoWayAttentionBlock(
             embedding_dim,
             num_heads,
-            p_dropout,
             downsample_rate=attention_downsample_rate,
         )
         self.norm2 = nn.LayerNorm(embedding_dim)
-        self.dropout2 = nn.Dropout(p_dropout)
 
         self.mlp = MLPBlock(
             embedding_dim,
@@ -166,13 +159,11 @@ class TwoWayAttentionBlock(nn.Module):
         )
 
         self.norm3 = nn.LayerNorm(embedding_dim)
-        self.dropout3 = nn.Dropout(p_dropout)
 
         self.norm4 = nn.LayerNorm(embedding_dim)
         self.cross_attn_image_to_token = AttentionForTwoWayAttentionBlock(
             embedding_dim,
             num_heads,
-            p_dropout,
             downsample_rate=attention_downsample_rate,
         )
 
@@ -185,19 +176,19 @@ class TwoWayAttentionBlock(nn.Module):
         if not self.skip_first_layer_pe:
             queries = queries + query_pe
         attn_out = self.self_attn(q=queries, k=queries, v=queries)
-        queries = queries + self.dropout1(attn_out)
+        queries = queries + attn_out
         queries = self.norm1(queries)
 
         # Cross attention block, tokens attending to image embedding
         q = queries + query_pe
         k = keys + key_pe
         attn_out = self.cross_attn_token_to_image(q=q, k=k, v=keys)
-        queries = queries + self.dropout2(attn_out)
+        queries = queries + attn_out
         queries = self.norm2(queries)
 
         # MLP block
         mlp_out = self.mlp(queries)
-        queries = queries + self.dropout3(mlp_out)
+        queries = queries + mlp_out
         queries = self.norm3(queries)
 
         # Cross attention block, image embedding attending to tokens
@@ -220,8 +211,6 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
         self,
         embedding_dim: int,
         num_heads: int,
-        attn_dropout: float = 0.0,
-        proj_dropout: float = 0.0,
         downsample_rate: int = 1,
     ) -> None:
         super().__init__()
@@ -233,14 +222,9 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
         ), "num_heads must divide embedding_dim."
 
         self.q_proj = nn.Linear(embedding_dim, self.internal_dim)
-        self.q_dropout = nn.Dropout(proj_dropout)
         self.k_proj = nn.Linear(embedding_dim, self.internal_dim)
-        self.k_dropout = nn.Dropout(proj_dropout)
         self.v_proj = nn.Linear(embedding_dim, self.internal_dim)
-        self.v_dropout = nn.Dropout(proj_dropout)
-        self.attn_dropout = nn.Dropout(attn_dropout)
         self.out_proj = nn.Linear(self.internal_dim, embedding_dim)
-        self.out_dropout = nn.Dropout(proj_dropout)
         self._reset_parameters()
 
     def _reset_parameters(self) -> None:
@@ -271,9 +255,9 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
 
     def forward(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
         # Input projections
-        q = self.q_dropout(self.q_proj(q))
-        k = self.k_dropout(self.k_proj(k))
-        v = self.v_dropout(self.v_proj(v))
+        q = self.q_proj(q)
+        k = self.k_proj(k)
+        v = self.v_proj(v)
 
         # Separate into heads
         q = self._separate_heads(q, self.num_heads)
@@ -285,11 +269,10 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
         attn = q @ k.permute(0, 1, 3, 2)  # B x N_heads x N_tokens x N_tokens
         attn = attn / math.sqrt(c_per_head)
         attn = torch.softmax(attn, dim=-1)
-        attn = self.attn_dropout(attn)
         # Get output
         out = attn @ v
         out = self._recombine_heads(out)
-        out = self.out_dropout(self.out_proj(out))
+        out = self.out_proj(out)
         return out
 
 
@@ -331,10 +314,6 @@ class Sam(nn.Module):
         )
         self.H = -1
         self.W = -1
-
-    @property
-    def device(self) -> Any:
-        return self.pixel_mean.device
 
     @torch.jit.export
     def predict_masks(
@@ -529,7 +508,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
     decoder_transformer_depth = 2
     decoder_transformer_mlp_dim = 2048
     decoder_num_heads = 8
-    decoder_p_dropout = 0.1
     decoder_upscaling_layer_dims = [64, 32]
     num_multimask_outputs = 3
     iou_head_depth = 3
@@ -575,7 +553,6 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
                 embedding_dim=encoder_transformer_output_dim,
                 num_heads=decoder_num_heads,
                 mlp_dim=decoder_transformer_mlp_dim,
-                p_dropout=decoder_p_dropout,
                 activation=activation_fn,
                 normalize_before_activation=normalize_before_activation,
             ),
@@ -596,8 +573,3 @@ def build_efficient_sam(checkpoint=None, device='cpu'):
         sam.load_state_dict(state_dict['model'])
     sam.to(torch.device(device))
     return sam
-
-
-
-
-# Run on a single image

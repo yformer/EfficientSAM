@@ -68,9 +68,6 @@ class PromptEncoder(nn.Module):
         point_embedding[labels == 3] += self.bbox_bottom_right_embeddings.weight
         return point_embedding
 
-    def _get_device(self) -> torch.device:
-        return self.point_embeddings.weight.device
-
     def forward(
         self,
         coords,

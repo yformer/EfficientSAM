@@ -56,8 +56,6 @@ class Attention(nn.Module):
         num_heads=8,
         qkv_bias=False,
         qk_scale=None,
-        attn_drop=0.0,
-        proj_drop=0.0,
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -65,9 +63,7 @@ class Attention(nn.Module):
         self.scale = qk_scale or head_dim**-0.5
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x):
         B, N, C = x.shape
@@ -84,11 +80,9 @@ class Attention(nn.Module):
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
 
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
-        x = self.proj_drop(x)
         return x
 
 
@@ -99,7 +93,6 @@ class Mlp(nn.Module):
         hidden_features=None,
         out_features=None,
         act_layer=nn.GELU,
-        drop=0.0,
     ):
         super().__init__()
         out_features = out_features or in_features
@@ -107,14 +100,11 @@ class Mlp(nn.Module):
         self.fc1 = nn.Linear(in_features, hidden_features)
         self.act = act_layer()
         self.fc2 = nn.Linear(hidden_features, out_features)
-        self.drop = nn.Dropout(drop)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.act(x)
-        x = self.drop(x)
         x = self.fc2(x)
-        x = self.drop(x)
         return x
 
 
@@ -126,9 +116,6 @@ class Block(nn.Module):
         mlp_ratio=4.0,
         qkv_bias=False,
         qk_scale=None,
-        drop=0.0,
-        attn_drop=0.0,
-        drop_path=0.0,
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
     ):
@@ -139,8 +126,6 @@ class Block(nn.Module):
             num_heads=num_heads,
             qkv_bias=qkv_bias,
             qk_scale=qk_scale,
-            attn_drop=attn_drop,
-            proj_drop=drop,
         )
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -148,7 +133,6 @@ class Block(nn.Module):
             in_features=dim,
             hidden_features=mlp_hidden_dim,
             act_layer=act_layer,
-            drop=drop,
         )
     def forward(self, x):
         x = x + self.attn(self.norm1(x))
