@@ -245,7 +245,7 @@ class ImageEncoderViT(nn.Module):
         ), "input image size must match self.img_size"
         x = self.patch_embed(x)
         # B C H W -> B H W C
-        x = x.permute(0, 2, 3, 1)  # vit det block takes BHWC as input
+        x = x.permute(0, 2, 3, 1)
         x = x + get_abs_pos(
             self.pos_embed, self.pretrain_use_cls_token, [x.shape[1], x.shape[2]]
         )
