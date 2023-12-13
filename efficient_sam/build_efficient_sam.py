@@ -311,8 +311,6 @@ class Sam(nn.Module):
         self.register_buffer(
             "pixel_std", torch.Tensor(pixel_std).view(1, 3, 1, 1), False
         )
-        self.H = -1
-        self.W = -1
 
     @torch.jit.export
     def predict_masks(
@@ -321,6 +319,8 @@ class Sam(nn.Module):
         batched_points: torch.Tensor,
         batched_point_labels: torch.Tensor,
         multimask_output: bool,
+        input_h: int,
+        input_w: int,
         output_h: int = -1,
         output_w: int = -1,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -339,7 +339,7 @@ class Sam(nn.Module):
 
         batch_size, max_num_queries, num_pts, _ = batched_points.shape
         num_pts = batched_points.shape[2]
-        rescaled_batched_points = self.get_rescaled_pts(batched_points)
+        rescaled_batched_points = self.get_rescaled_pts(batched_points, input_h, input_w)
 
         if num_pts > self.decoder_max_num_input_points:
             rescaled_batched_points = rescaled_batched_points[
@@ -411,20 +411,17 @@ class Sam(nn.Module):
         )
         return output_masks, iou_predictions
 
-    def get_rescaled_pts(self, batched_points):
-        assert (
-            self.H > 0 and self.W > 0
-        ), "preprocess must be called before calling this function."
+    def get_rescaled_pts(self, batched_points: torch.tensor, input_h: int, input_w: int):
         return torch.stack(
             [
                 torch.where(
                     batched_points[..., 0] >= 0,
-                    batched_points[..., 0] * self.image_encoder.img_size / self.W,
+                    batched_points[..., 0] * self.image_encoder.img_size / input_w,
                     -1.0,
                 ),
                 torch.where(
                     batched_points[..., 1] >= 0,
-                    batched_points[..., 1] * self.image_encoder.img_size / self.H,
+                    batched_points[..., 1] * self.image_encoder.img_size / input_h,
                     -1.0,
                 ),
             ],
@@ -469,21 +466,21 @@ class Sam(nn.Module):
             low_res_mask: A tensor of shape [B, 256, 256] of predicted masks
             iou_predictions: A tensor of shape [B, max_num_queries] of estimated IOU scores
         """
-        batch_size, _, _, _ = batched_images.shape
+        batch_size, _, input_h, input_w = batched_images.shape
         image_embeddings = self.get_image_embeddings(batched_images)
         return self.predict_masks(
             image_embeddings,
             batched_points,
             batched_point_labels,
             multimask_output=True,
-            output_h=self.H if scale_to_original_image_size else -1,
-            output_w=self.W if scale_to_original_image_size else -1,
+            input_h=input_h,
+            input_w=input_w,
+            output_h=input_h if scale_to_original_image_size else -1,
+            output_w=input_w if scale_to_original_image_size else -1,
         )
 
     def preprocess(self, x: torch.Tensor) -> torch.Tensor:
         """Normalize pixel values and pad to a square input."""
-        self.H = x.shape[2]
-        self.W = x.shape[3]
         if (
             x.shape[2] != self.image_encoder.img_size
             or x.shape[3] != self.image_encoder.img_size
