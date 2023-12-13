@@ -411,7 +411,7 @@ class Sam(nn.Module):
         )
         return output_masks, iou_predictions
 
-    def get_rescaled_pts(self, batched_points: torch.tensor, input_h: int, input_w: int):
+    def get_rescaled_pts(self, batched_points: torch.Tensor, input_h: int, input_w: int):
         return torch.stack(
             [
                 torch.where(
