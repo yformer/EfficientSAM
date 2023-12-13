@@ -2,7 +2,7 @@
 EfficientSAM: Leveraged Masked Image Pretraining for Efficient Segment Anything
 
 ## News
-[Dec.11 2023] The model code is fully available in this repository. The [sample_inference](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py) binary shows how to instantiate the model and query points on an image.
+[Dec.11 2023] The EfficientSAM model code with checkpoints is fully available in this repository. The [example](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py) script shows how to instantiate the model with checkpoint and query points on an image.
 
 [Dec.6 2023] EfficientSAM demo is available on the [Hugging Face Space](https://huggingface.co/spaces/yunyangx/EfficientSAM) (huge thanks to all the HF team for their support).
 
@@ -20,16 +20,16 @@ Segment everything |![segment everything](figs/examples/demo_everything.png)
 Saliency | ![Saliency](figs/examples/demo_saliency.png)
 
 ## Model
-The weights file based on VIT-tiny and VIT-small are available under the weights folder of this github repository. Example instantiations and run of the models can be found in [EfficientSAM_example.py](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py).
+EfficientSAM checkpoints are available under the weights folder of this github repository. Example instantiations and run of the models can be found in [EfficientSAM_example.py](https://github.com/yformer/EfficientSAM/blob/main/EfficientSAM_example.py).
 
 | EfficientSAM-S | EfficientSAM-Ti |
 |------------------------------|------------------------------|
 | [Download](https://github.com/yformer/EfficientSAM/blob/main/weights/efficient_sam_vits.pt.zip) |[Download](https://github.com/yformer/EfficientSAM/blob/main/weights/efficient_sam_vitt.pt)|
 
-You can directly use EfficientSAM,
+You can directly use EfficientSAM with checkpoints,
 ```
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
-efficient_sam_vit = build_efficient_sam_vitt()
+efficientsam = build_efficient_sam_vitt()
 ```
 
 ## Colab
