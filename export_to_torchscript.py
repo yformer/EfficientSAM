@@ -1,6 +1,6 @@
 import torch
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
-from squeeze_sam.build_squeeze_sam import build_squeeze_sam
+# from squeeze_sam.build_squeeze_sam import build_squeeze_sam
 import zipfile
 import os
 
@@ -14,4 +14,4 @@ with zipfile.ZipFile("weights/efficient_sam_vits.pt.zip", 'r') as zip_ref:
 torch.jit.save(torch.jit.script(build_efficient_sam_vits()), "torchscripted_model/efficient_sam_vits_torchscript.pt")
 
 # Squeeze SAM (UNET)
-torch.jit.save(torch.jit.script(build_squeeze_sam()), "torchscripted_model/squeeze_sam_torchscript.pt")
+# torch.jit.save(torch.jit.script(build_squeeze_sam()), "torchscripted_model/squeeze_sam_torchscript.pt")
