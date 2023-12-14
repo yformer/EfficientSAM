@@ -17,13 +17,11 @@ models['efficientsam_ti'] = build_efficient_sam_vitt()
 # Since EfficientSAM-S checkpoint file is >100MB, we store the zip file.
 with zipfile.ZipFile("weights/efficient_sam_vits.pt.zip", 'r') as zip_ref:
     zip_ref.extractall("weights")
-# # Build the EfficientSAM-S model.
+# Build the EfficientSAM-S model.
 models['efficientsam_s'] = build_efficient_sam_vits()
-
 
 # Build the SqueezeSAM model.
 models['squeeze_sam'] = build_squeeze_sam()
-
 
 # load an image
 sample_image_np = np.array(Image.open("figs/examples/dogs.jpg"))
