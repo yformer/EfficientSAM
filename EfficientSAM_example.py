@@ -1,5 +1,5 @@
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
-# from squeeze_sam.build_squeeze_sam import build_squeeze_sam
+from squeeze_sam.build_squeeze_sam import build_squeeze_sam
 
 from PIL import Image
 from torchvision import transforms
@@ -21,7 +21,7 @@ with zipfile.ZipFile("weights/efficient_sam_vits.pt.zip", 'r') as zip_ref:
 models['efficientsam_s'] = build_efficient_sam_vits()
 
 # Build the SqueezeSAM model.
-# models['squeeze_sam'] = build_squeeze_sam()
+models['squeeze_sam'] = build_squeeze_sam()
 
 # load an image
 sample_image_np = np.array(Image.open("figs/examples/dogs.jpg"))
