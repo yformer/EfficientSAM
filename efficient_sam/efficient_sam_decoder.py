@@ -62,20 +62,14 @@ class PromptEncoder(nn.Module):
         point_embedding = self.pe_layer.forward_with_coords(
             points, self.input_image_size
         )
-        print('point_embedding=',point_embedding.shape)
-        print('labels=',labels.shape)
-        print('self.invalid_points.weight=',self.invalid_points.weight.shape)
-
         invalid_label_ids = torch.eq(labels, -1)[:,:,None]
         point_label_ids = torch.eq(labels, 1)[:,:,None]
         topleft_label_ids = torch.eq(labels, 2)[:,:,None]
         bottomright_label_ids = torch.eq(labels, 3)[:,:,None]
-
         point_embedding = point_embedding + self.invalid_points.weight[:,None,:] * invalid_label_ids
         point_embedding = point_embedding + self.point_embeddings.weight[:,None,:] * point_label_ids
         point_embedding = point_embedding + self.bbox_top_left_embeddings.weight[:,None,:] * topleft_label_ids
         point_embedding = point_embedding + self.bbox_bottom_right_embeddings.weight[:,None,:] * bottomright_label_ids
-
         return point_embedding
 
     def forward(
