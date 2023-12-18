@@ -34,9 +34,8 @@ from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_ef
 efficientsam = build_efficient_sam_vitt()
 ```
 
-## Colab
-The colab is shared [here](https://github.com/yformer/EfficientSAM/blob/main/notebooks/EfficientSAM_example.ipynb)
-
+## Jupyter Notebook Example
+The notebook is shared [here](https://github.com/yformer/EfficientSAM/blob/main/notebooks)
 
 
 ## Acknowledgement
