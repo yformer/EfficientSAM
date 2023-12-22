@@ -208,6 +208,8 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
         assert (
             self.internal_dim % num_heads == 0
         ), "num_heads must divide embedding_dim."
+        self.c_per_head = self.internal_dim / num_heads
+        self.inv_sqrt_c_per_head = 1.0 / math.sqrt(self.c_per_head)
 
         self.q_proj = nn.Linear(embedding_dim, self.internal_dim)
         self.k_proj = nn.Linear(embedding_dim, self.internal_dim)
@@ -255,7 +257,7 @@ class AttentionForTwoWayAttentionBlock(nn.Module):
         # Attention
         _, _, _, c_per_head = q.shape
         attn = q @ k.permute(0, 1, 3, 2)  # B x N_heads x N_tokens x N_tokens
-        attn = attn / math.sqrt(c_per_head)
+        attn = attn * self.inv_sqrt_c_per_head
         attn = torch.softmax(attn, dim=-1)
         # Get output
         out = attn @ v

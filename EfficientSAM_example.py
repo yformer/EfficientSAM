@@ -44,8 +44,6 @@ for model_name, model in models.items():
     predicted_logits = torch.take_along_dim(
         predicted_logits, sorted_ids[..., None, None], dim=2
     )
-
-
     # The masks are already sorted by their predicted IOUs.
     # The first dimension is the batch size (we have a single image. so it is 1).
     # The second dimension is the number of masks we want to generate (in this case, it is only 1)
