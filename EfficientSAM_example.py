@@ -39,6 +39,13 @@ for model_name, model in models.items():
         input_points,
         input_labels,
     )
+    sorted_ids = torch.argsort(predicted_iou, dim=-1, descending=True)
+    predicted_iou = torch.take_along_dim(predicted_iou, sorted_ids, dim=2)
+    predicted_logits = torch.take_along_dim(
+        predicted_logits, sorted_ids[..., None, None], dim=2
+    )
+
+
     # The masks are already sorted by their predicted IOUs.
     # The first dimension is the batch size (we have a single image. so it is 1).
     # The second dimension is the number of masks we want to generate (in this case, it is only 1)
