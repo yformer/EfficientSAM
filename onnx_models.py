@@ -121,7 +121,7 @@ class OnnxEfficientSam(torch.nn.Module):
             output_masks = F.interpolate(
                 low_res_masks,
                 (output_h, output_w),
-                # NOTE: "bicubic" is too slow for onnx
+                # NOTE: "bicubic" is inefficient on onnx
                 mode="bilinear",
             )
             output_masks = torch.reshape(
