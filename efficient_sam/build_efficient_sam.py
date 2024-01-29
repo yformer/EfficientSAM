@@ -4,7 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from .efficient_sam import build_efficient_sam
+from efficient_sam import build_efficient_sam
 
 def build_efficient_sam_vitt():
     return build_efficient_sam(

@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .mlp import MLPBlock
+from mlp import MLPBlock
 
 
 class PromptEncoder(nn.Module):
