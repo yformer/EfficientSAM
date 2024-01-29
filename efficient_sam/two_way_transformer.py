@@ -2,7 +2,7 @@ import math
 from typing import Tuple, Type
 import torch
 from torch import nn, Tensor
-from .mlp import MLPBlock
+from mlp import MLPBlock
 
 
 
