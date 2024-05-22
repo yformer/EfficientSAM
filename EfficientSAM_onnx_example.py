@@ -59,6 +59,7 @@ def predict_onnx(input_image, input_points, input_labels):
         print("decoder time", time.time() - t_start)
     mask = predicted_logits[0, 0, 0, :, :] >= 0
     imgviz.io.imsave(f"figs/examples/dogs_onnx_mask.png", mask)
+    return mask
 
 
 def main():
