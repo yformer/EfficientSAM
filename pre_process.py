@@ -43,7 +43,17 @@ def process_folders(training_file_path, label_file_path, output_folder):
                 final_image = final_image.astype(np.float32) / 255.0
 
                 # call for select_erode function to select a pixel
-                chosen_pixel = select_erode(training_slice)
+                chosen_pixel = select_erode(label_slice)
+                if chosen_pixel is None:
+                    label_slice = (label_slice * 255).astype(np.uint8)  # Scale label
+                    label_slice = np.stack([label_slice] * 3, axis=-1)
+                    concatenated_array = np.concatenate((rgb_image, label_slice), axis=1)
+                    concatenated_image = Image.fromarray(concatenated_array)
+                    # Save the image
+                    output_path = os.path.join(output_folder, f'concatenated_image_{img_index}_{slice_index}.png')
+                    concatenated_image.save(output_path)
+                    print(f'Image saved: {output_path}')
+                    continue
                 chosen_pixel_array = np.array([chosen_pixel])  # 1x2
                 chosen_pixel_array = np.expand_dims(chosen_pixel_array, axis=0)  # 1x1x2
                 chosen_pixel_array = np.expand_dims(chosen_pixel_array, axis=0) # 1x1x1x2
@@ -68,14 +78,16 @@ def process_folders(training_file_path, label_file_path, output_folder):
 def select_erode(np_img, remaining_pixels=25):
     kernel = np.ones((5, 5), dtype=np.uint8)
     pixels_positive = np_img.sum()
-    erosion = np_img.copy()
+    before_erosion = np_img.copy()
     while pixels_positive > remaining_pixels:
-        erosion = cv2.erode(erosion, kernel, iterations=1)
-        pixels_positive = erosion.sum()
-        print(f'Pixels remaining: {pixels_positive}')
+        after_erosion = cv2.erode(before_erosion, kernel, iterations=1)
+        pixels_positive = after_erosion.sum()
+        if pixels_positive == 0:
+            break
+        before_erosion = after_erosion
 
     # find the coordinates of the non-zero pixels
-    nonzero_coords = np.argwhere(erosion > 0)
+    nonzero_coords = np.argwhere(before_erosion > 0)
 
     # if there are non-zero pixels, randomly select one
     if nonzero_coords.size > 0:
