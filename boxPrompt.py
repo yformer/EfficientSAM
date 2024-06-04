@@ -14,6 +14,7 @@ from torchvision.transforms import ToTensor
 from visualizationTools import show_mask, show_points, show_box, show_anns_ours, run_ours_box_or_points
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
 from EvaluationMetrics import compute_iou, compute_dice
+from utils import parse_dataset
 efficient_sam_vitt_model = build_efficient_sam_vitt()
 efficient_sam_vitt_model.eval()
 
@@ -52,8 +53,8 @@ def run_ours_box_or_points(image_np, pts_sampled, pts_labels, model):
     return torch.ge(predicted_logits[0, 0, 0, :, :], 0).cpu().detach().numpy()
 
 
-def process_folders(training_file_path, label_file_path, output_folder, append_to_csv = True):
-    img_index = os.path.basename(training_file_path).split('_')[1].split('.')[0]
+def process_folders(training_file_path, label_file_path, output_folder, append_to_csv=True):
+    img_sticker = os.path.basename(training_file_path).split('.')[0]
 
     training_img = nib.load(training_file_path)
     label_img = nib.load(label_file_path)
@@ -86,15 +87,9 @@ def process_folders(training_file_path, label_file_path, output_folder, append_t
             y1 = y1 - enlarge_by
             y2 = y2 + enlarge_by
 
-            # Print bounding box coordinates
-            #print(f"Bounding Box Coordinates for Slice {slice_index}: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
-
             fig, ax = plt.subplots(1, 4, figsize=(50, 30))
             input_point = np.array([[x1, y1], [x2, y2]])
             input_label = np.array([2, 3])
-
-            # Draw bounding box on the image for debugging
-            #cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
             show_points(input_point, input_label, ax[0])
             show_box([x1, y1, x2, y2], ax[0])
@@ -116,37 +111,35 @@ def process_folders(training_file_path, label_file_path, output_folder, append_t
             ax[2].title.set_text(f"EfficientSAM (VIT-small)\nIoU: {iou_vits:.4f}, Dice: {dice_vits:.4f}")
             ax[2].axis('off')
 
-            # Visualize the label_slice in ax[3]
             ax[3].imshow(label_slice, cmap='gray')
             ax[3].title.set_text(f'Label Slice {slice_index}')
             ax[3].axis('off')
 
-            plt.savefig(os.path.join(output_folder, f"segmented_slice_{slice_index}.png"))
+            slice_filename = os.path.join(output_folder, f"{img_sticker}_segmented_slice_{slice_index}.png")
+            plt.savefig(slice_filename)
             plt.close(fig)
 
-            # Append IoU and Dice scores to the data list
             iou_dice_data.append({
+                "Image Sticker": img_sticker,
                 "Slice Index": slice_index,
                 "Model": "EfficientSAM (VIT-tiny)",
                 "IoU": iou_vitt,
                 "Dice": dice_vitt
             })
             iou_dice_data.append({
+                "Image Sticker": img_sticker,
                 "Slice Index": slice_index,
                 "Model": "EfficientSAM (VIT-small)",
                 "IoU": iou_vits,
                 "Dice": dice_vits
             })
 
-    # Convert the data list to a DataFrame and save as CSV
     iou_dice_df = pd.DataFrame(iou_dice_data)
-    if append_to_csv and os.path.exists(os.path.join(output_folder, "iou_dice_scores.csv")):
-        existing_iou_dice_df = pd.read_csv(os.path.join(output_folder, "iou_dice_scores.csv"))
+    csv_path = os.path.join(output_folder, "iou_dice_scores.csv")
+    if append_to_csv and os.path.exists(csv_path):
+        existing_iou_dice_df = pd.read_csv(csv_path)
         iou_dice_df = pd.concat([existing_iou_dice_df, iou_dice_df], ignore_index=True)
-        iou_dice_df.to_csv(os.path.join(output_folder, "iou_dice_scores.csv"), index=False)
-    else:
-        iou_dice_df.to_csv(os.path.join(output_folder, "iou_dice_scores.csv"), index=False)
-
+    iou_dice_df.to_csv(csv_path, index=False)
 
 
 def main():
