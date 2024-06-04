@@ -5,12 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import zipfile
+import json
+import pandas as pd
+
 
 from PIL import Image
 from torchvision.transforms import ToTensor
 from visualizationTools import show_mask, show_points, show_box, show_anns_ours, run_ours_box_or_points
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt, build_efficient_sam_vits
-
+from EvaluationMetrics import compute_iou, compute_dice
 efficient_sam_vitt_model = build_efficient_sam_vitt()
 efficient_sam_vitt_model.eval()
 
@@ -49,7 +52,7 @@ def run_ours_box_or_points(image_np, pts_sampled, pts_labels, model):
     return torch.ge(predicted_logits[0, 0, 0, :, :], 0).cpu().detach().numpy()
 
 
-def process_folders(training_file_path, label_file_path, output_folder):
+def process_folders(training_file_path, label_file_path, output_folder, append_to_csv = True):
     img_index = os.path.basename(training_file_path).split('_')[1].split('.')[0]
 
     training_img = nib.load(training_file_path)
@@ -63,6 +66,8 @@ def process_folders(training_file_path, label_file_path, output_folder):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
+    iou_dice_data = []
+
     for slice_index in range(label_data.shape[2]):
         label_slice = label_data[:, :, slice_index]
 
@@ -71,7 +76,7 @@ def process_folders(training_file_path, label_file_path, output_folder):
             rgb_image = convert_to_rgb(training_slice, min_hu=-1200, max_hu=3000)
 
             # Calculate bounding box
-            x1,y1,w,h = cv2.boundingRect(label_slice.astype(np.uint8))
+            x1, y1, w, h = cv2.boundingRect(label_slice.astype(np.uint8))
             x2 = x1 + w
             y2 = y1 + h
             enlarge_by = 6 
@@ -82,9 +87,9 @@ def process_folders(training_file_path, label_file_path, output_folder):
             y2 = y2 + enlarge_by
 
             # Print bounding box coordinates
-            print(f"Bounding Box Coordinates for Slice {slice_index}: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+            #print(f"Bounding Box Coordinates for Slice {slice_index}: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
 
-            fig, ax = plt.subplots(1, 4, figsize=(40, 30))
+            fig, ax = plt.subplots(1, 4, figsize=(50, 30))
             input_point = np.array([[x1, y1], [x2, y2]])
             input_label = np.array([2, 3])
 
@@ -98,13 +103,17 @@ def process_folders(training_file_path, label_file_path, output_folder):
             ax[1].imshow(rgb_image)
             mask_efficient_sam_vitt = run_ours_box_or_points(rgb_image, input_point, input_label, efficient_sam_vitt_model)
             show_anns_ours(mask_efficient_sam_vitt, ax[1])
-            ax[1].title.set_text("EfficientSAM (VIT-tiny)")
+            iou_vitt = compute_iou(mask_efficient_sam_vitt, label_slice)
+            dice_vitt = compute_dice(mask_efficient_sam_vitt, label_slice)
+            ax[1].title.set_text(f"EfficientSAM (VIT-tiny)\nIoU: {iou_vitt:.4f}, Dice: {dice_vitt:.4f}")
             ax[1].axis('off')
 
             ax[2].imshow(rgb_image)
             mask_efficient_sam_vits = run_ours_box_or_points(rgb_image, input_point, input_label, efficient_sam_vits_model)
             show_anns_ours(mask_efficient_sam_vits, ax[2])
-            ax[2].title.set_text("EfficientSAM (VIT-small)")
+            iou_vits = compute_iou(mask_efficient_sam_vits, label_slice)
+            dice_vits = compute_dice(mask_efficient_sam_vits, label_slice)
+            ax[2].title.set_text(f"EfficientSAM (VIT-small)\nIoU: {iou_vits:.4f}, Dice: {dice_vits:.4f}")
             ax[2].axis('off')
 
             # Visualize the label_slice in ax[3]
@@ -115,15 +124,44 @@ def process_folders(training_file_path, label_file_path, output_folder):
             plt.savefig(os.path.join(output_folder, f"segmented_slice_{slice_index}.png"))
             plt.close(fig)
 
+            # Append IoU and Dice scores to the data list
+            iou_dice_data.append({
+                "Slice Index": slice_index,
+                "Model": "EfficientSAM (VIT-tiny)",
+                "IoU": iou_vitt,
+                "Dice": dice_vitt
+            })
+            iou_dice_data.append({
+                "Slice Index": slice_index,
+                "Model": "EfficientSAM (VIT-small)",
+                "IoU": iou_vits,
+                "Dice": dice_vits
+            })
 
-training_data_folder = 'dataset/Task04_Lung/imagesTr'
-label_data_folder = 'dataset/Task04_Lung/labelsTr'
-output_folder = 'dataset/Task04_Lung/output'
-
-for filename in os.listdir(training_data_folder):
-    if filename.endswith('.nii.gz') and not filename.startswith('._'):
-        training_file_path = os.path.join(training_data_folder, filename)
-        label_file_path = os.path.join(label_data_folder, filename)
-        process_folders(training_file_path, label_file_path, output_folder)
+    # Convert the data list to a DataFrame and save as CSV
+    iou_dice_df = pd.DataFrame(iou_dice_data)
+    if append_to_csv and os.path.exists(os.path.join(output_folder, "iou_dice_scores.csv")):
+        existing_iou_dice_df = pd.read_csv(os.path.join(output_folder, "iou_dice_scores.csv"))
+        iou_dice_df = pd.concat([existing_iou_dice_df, iou_dice_df], ignore_index=True)
+        iou_dice_df.to_csv(os.path.join(output_folder, "iou_dice_scores.csv"), index=False)
     else:
-        print(f'One of the paths does not exist: {training_data_folder}, {label_data_folder}')
+        iou_dice_df.to_csv(os.path.join(output_folder, "iou_dice_scores.csv"), index=False)
+
+
+
+def main():
+    training_data_folder = 'dataset/Task06_Lung/imagesTr'
+    label_data_folder = 'dataset/Task06_Lung/labelsTr'
+    output_folder = 'dataset/Task06_Lung/output'
+
+    for filename in os.listdir(training_data_folder):
+        if filename.endswith('.nii.gz') and not filename.startswith('._'):
+            training_file_path = os.path.join(training_data_folder, filename)
+            label_file_path = os.path.join(label_data_folder, filename)
+            process_folders(training_file_path, label_file_path, output_folder)
+        else:
+            print(f'One of the paths does not exist: {training_data_folder}, {label_data_folder}')
+
+
+if __name__ == "__main__":
+    main()
