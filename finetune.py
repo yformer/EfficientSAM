@@ -231,7 +231,7 @@ if __name__ == "__main__":
     # load image and label
     training_data_folder = "dataset/Task06_Lung/imagesTr"
     label_data_folder = "dataset/Task06_Lung/labelsTr"
-    output_folder = "dataset/Task06_Lung/output"
+    output_folder = "dataset/Task06_Lung/output/madsam"
 
     for filename in os.listdir(training_data_folder):
         if filename.endswith(".nii.gz") and not filename.startswith("._"):
