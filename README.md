@@ -1,3 +1,18 @@
+## Update -- Efficient Track Anything
+
+Our new release on [**Efficient Track Anything**](https://github.com/yformer/EfficientTAM).
+
+* Efficient Track Anything code: https://github.com/yformer/EfficientTAM
+* Efficient Track Anything project (with gradio demo): https://yformer.github.io/efficient-track-anything/
+* Efficient Track Anything paper: https://arxiv.org/pdf/2411.18933
+
+![Efficient Track Anything design](figs/examples/overview.png)
+
+**Efficient Track Anything** is an efficient foundation model for promptable unified image and video segmentation.
+
+[`🤗Efficient Track Anything for video segmentation`](https://b333c06fe5620afb10.gradio.live)
+[`🤗Efficient Track Anything for segment everything`](https://5239f8e221db7ee8a0.gradio.live/)
+
 # EfficientSAM
 EfficientSAM: Leveraged Masked Image Pretraining for Efficient Segment Anything
 
