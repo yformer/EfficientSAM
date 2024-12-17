@@ -10,7 +10,7 @@ Our new release on [**Efficient Track Anything**](https://github.com/yformer/Eff
 
 **Efficient Track Anything** is an efficient foundation model for promptable unified image and video segmentation.
 
-[`🤗Efficient Track Anything for video segmentation`](https://f4068764114ebefeb4.gradio.live)
+[`🤗Efficient Track Anything for video segmentation`](https://bea2c478296e25b3ce.gradio.live)
 
 [`🤗Efficient Track Anything for segment everything`](https://5239f8e221db7ee8a0.gradio.live)
 
